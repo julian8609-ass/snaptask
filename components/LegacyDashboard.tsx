@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { TaskCard } from '@/components/TaskCard';
 import { TaskCalendar } from '@/components/TaskCalendar';
 
@@ -159,6 +159,7 @@ export function LegacyDashboard() {
   const [chatInput, setChatInput] = useState('');
   const [isChatting, setIsChatting] = useState(false);
   const [chatError, setChatError] = useState<string | null>(null);
+  const chatEndRef = useRef<HTMLDivElement>(null);
 
   const activeCount = useMemo(() => tasks.filter((task) => task.status !== 'completed').length, [tasks]);
   const completedCount = useMemo(() => tasks.filter((task) => task.status === 'completed').length, [tasks]);
@@ -210,6 +211,10 @@ export function LegacyDashboard() {
     void loadTasks();
     void loadProfile();
   }, []);
+
+  useEffect(() => {
+    chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [chatMessages]);
 
   const rank = profile?.rank ?? 'Bronze';
   const xp = profile?.xp ?? 0;
@@ -324,6 +329,58 @@ export function LegacyDashboard() {
           content: 'I hit a snag replying just now, but I\'m still here. Try asking again in a simpler way.',
         },
       ]);
+    } finally {
+      setIsChatting(false);
+    }
+  };
+
+  const handleRegenerateChat = async () => {
+    // Find the last user message and remove the last assistant reply
+    const reversed = [...chatMessages].reverse();
+    const lastUserMsg = reversed.find((m) => m.role === 'user');
+    if (!lastUserMsg || isChatting) return;
+
+    // Drop the last assistant message so we get a fresh one
+    const withoutLastReply = [...chatMessages];
+    if (withoutLastReply[withoutLastReply.length - 1]?.role === 'assistant') {
+      withoutLastReply.pop();
+    }
+
+    setChatMessages(withoutLastReply);
+    setChatError(null);
+    setIsChatting(true);
+
+    try {
+      const response = await fetch('/api/ai', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type: 'chat',
+          mood: profile?.mood || 'focused',
+          personality: profile?.personality || 'calm_mentor',
+          messages: withoutLastReply,
+          context: {
+            rank: profile?.rank || rank,
+            energy: profile?.energy ?? 0,
+            activeTasks: activeCount,
+            completedTasks: completedCount,
+            recentTasks: tasks.slice(0, 3).map((task) => task.title),
+          },
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to get AI response.');
+      }
+
+      const data = (await response.json()) as { response?: string; error?: string };
+      if (!data.response) {
+        throw new Error(data.error || 'Failed to get AI response.');
+      }
+
+      setChatMessages((current) => [...current, { role: 'assistant', content: data.response as string }]);
+    } catch (error) {
+      setChatError(error instanceof Error ? error.message : 'Failed to get AI response.');
     } finally {
       setIsChatting(false);
     }
@@ -530,6 +587,7 @@ export function LegacyDashboard() {
                     </div>
                   </div>
                 )}
+                <div ref={chatEndRef} />
               </div>
 
               <label className="mt-4 block text-sm font-medium text-slate-200">
@@ -563,6 +621,15 @@ export function LegacyDashboard() {
                   className="rounded-full border border-white/10 bg-white/5 px-7 py-3 text-sm font-semibold text-slate-100 transition hover:bg-white/10"
                 >
                   Reset chat
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => void handleRegenerateChat()}
+                  disabled={isChatting || chatMessages[chatMessages.length - 1]?.role !== 'assistant'}
+                  className="rounded-full border border-orange-400/20 bg-orange-400/10 px-7 py-3 text-sm font-semibold text-orange-200 transition hover:bg-orange-400/20 disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  Regenerate response
                 </button>
               </div>
             </form>

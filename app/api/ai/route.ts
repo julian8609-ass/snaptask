@@ -1,9 +1,10 @@
 import { NextResponse } from 'next/server';
-
-type ChatMessage = {
-  role: 'system' | 'user' | 'assistant';
-  content: string;
-};
+import {
+  extractRecentAIReplies,
+  isRepetitive,
+  trimToWordLimit,
+  type ChatMessage,
+} from '@/lib/ai/chatUtils';
 
 type ChatContext = {
   mood?: string;
@@ -127,36 +128,62 @@ function getRandomSuggestions<T>(items: T[]) {
   return shuffleArray(items).slice(0, Math.min(items.length, 5));
 }
 
-function getFallbackChatReply(mood: string, personality: string, lastMessage: string, context: ChatContext) {
+function getFallbackChatReply(mood: string, personality: string, lastMessage: string, context: ChatContext, recentReplies: string[] = []) {
   const shortReply = lastMessage.trim().slice(0, 120) || 'that request';
   const lowerMessage = lastMessage.toLowerCase();
   const recentTask = context.recentTasks?.[0];
-  const taskHint = recentTask ? ` Your closest task is “${recentTask}.”` : '';
+  const taskHint = recentTask ? ` Your closest task is "${recentTask}."` : '';
+
+  const candidates: string[] = [];
 
   if (lowerMessage.includes('tiny step') || lowerMessage.includes('next step')) {
-    return `Make the next step smaller than you think: spend 2 minutes opening the task, writing the first line, or sending the first message.${taskHint} Want me to turn it into a 3-step micro plan?`;
+    candidates.push(
+      `Make the next step smaller than you think: spend 2 minutes opening the task, writing the first line, or sending the first message.${taskHint} Want me to turn it into a 3-step micro plan?`,
+      `Try this: open the task right now and write just one sentence.${taskHint} That single move beats any planning session.`,
+      `Break it to the atom: what is the one physical action you can do in the next 60 seconds?${taskHint}`
+    );
+  } else if (lowerMessage.includes('plan') || lowerMessage.includes('schedule')) {
+    candidates.push(
+      `Let's make it concrete: I can help you turn ${shortReply} into a simple plan with one action, one time, and one finish line.${taskHint} If you want, I'll do that now.`,
+      `A plan works best when it has three things: one task, one time, one done-signal.${taskHint} Want me to build that for ${shortReply}?`,
+      `Let's skip the big roadmap and focus on the next 24 hours only.${taskHint} I can sketch a quick schedule if you share your priorities.`
+    );
+  } else if (lowerMessage.includes('what should i do') || lowerMessage.includes('help') || lowerMessage.includes('stuck')) {
+    candidates.push(
+      `Start with the easiest honest win: choose one task, make it smaller, and do the first 2 minutes only.${taskHint} If you want, I can pick the best one for you.`,
+      `When stuck, shrink the scope: what is the tiniest version of the task you could finish today?${taskHint}`,
+      `Let's diagnose the block \u2014 is it unclear, scary, or just boring? Each one has a different fix.${taskHint}`
+    );
+  } else if (personality === 'strict_coach') {
+    candidates.push(
+      `Got it. For ${shortReply}, do the smallest version now and stop overthinking it.${taskHint} If you want, I can turn it into a 3-step plan.`,
+      `No excuses \u2014 pick one part of ${shortReply} and complete it before you do anything else.${taskHint}`,
+      `Execution beats planning. Start ${shortReply} for 5 minutes right now.${taskHint}`
+    );
+  } else if (personality === 'funny_friend') {
+    candidates.push(
+      `Absolutely. ${shortReply} sounds like a mission. I'm in.${taskHint} Want me to turn it into a goofy plan, a tiny next step, or a full task list?`,
+      `Oh, we are so doing ${shortReply}. Let's turn it into a tiny adventure.${taskHint} One step at a time, no pressure.`,
+      `${shortReply}? Challenge accepted! Tell me more and I'll cook up something fun.${taskHint}`
+    );
+  } else {
+    candidates.push(
+      `I hear you. For ${shortReply}, we can keep it simple and make one clear next move.${taskHint} If you want, I can break it down, schedule it, or make it easier.`,
+      `Let's approach ${shortReply} from a fresh angle \u2014 what part of it feels most manageable right now?${taskHint}`,
+      `Good news: ${shortReply} doesn't need a perfect plan, just one clear next action.${taskHint} Want me to find it?`
+    );
   }
 
-  if (lowerMessage.includes('plan') || lowerMessage.includes('schedule')) {
-    return `Let’s make it concrete: I can help you turn ${shortReply} into a simple plan with one action, one time, and one finish line.${taskHint} If you want, I’ll do that now.`;
+  for (const candidate of candidates) {
+    if (!isRepetitive(candidate, recentReplies, 0.6)) {
+      return candidate;
+    }
   }
 
-  if (lowerMessage.includes('what should i do') || lowerMessage.includes('help') || lowerMessage.includes('stuck')) {
-    return `Start with the easiest honest win: choose one task, make it smaller, and do the first 2 minutes only.${taskHint} If you want, I can pick the best one for you.`;
-  }
-
-  if (personality === 'strict_coach') {
-    return `Got it. For ${shortReply}, do the smallest version now and stop overthinking it.${taskHint} If you want, I can turn it into a 3-step plan.`;
-  }
-
-  if (personality === 'funny_friend') {
-    return `Absolutely. ${shortReply} sounds like a mission. I’m in.${taskHint} Want me to turn it into a goofy plan, a tiny next step, or a full task list?`;
-  }
-
-  return `I hear you. For ${shortReply}, we can keep it simple and make one clear next move.${taskHint} If you want, I can break it down, schedule it, or make it easier.`;
+  return `Let's try a different approach \u2014 instead of revisiting the same ground, what's one new thing you want to tackle or explore?${taskHint}`;
 }
 
-async function callOpenAIChat(messages: ChatMessage[]) {
+async function callOpenAIChat(messages: ChatMessage[], temperature = 0.7) {
   const key = process.env.OPENAI_API_KEY;
   if (!key) {
     console.error('OPENAI_API_KEY is not set.');
@@ -173,7 +200,8 @@ async function callOpenAIChat(messages: ChatMessage[]) {
       body: JSON.stringify({
         model: 'gpt-3.5-turbo',
         messages,
-        max_tokens: 250,
+        max_tokens: 300,
+        temperature,
       }),
     });
 
@@ -210,7 +238,8 @@ async function callOpenAI(prompt: string) {
           { role: 'system', content: 'You provide short fun task suggestions and reflections in JSON format.' },
           { role: 'user', content: prompt },
         ],
-        max_tokens: 250,
+        max_tokens: 300,
+        temperature: 0.7,
       }),
     });
 
@@ -254,30 +283,57 @@ export async function POST(request: Request) {
       };
       const lastUserMessage = [...messages].reverse().find((message) => message.role === 'user')?.content || '';
 
-      const systemPrompt =
+      const basePersonalityInstruction =
         personality === 'strict_coach'
           ? 'You are SnapTask AI, a direct but encouraging coach. Keep replies short, motivating, and conversational.'
           : personality === 'funny_friend'
           ? 'You are SnapTask AI, a playful friend. Keep replies warm, conversational, and lightly humorous.'
           : 'You are SnapTask AI, a calm mentor. Keep replies warm, conversational, and supportive.';
 
-      const responseText = await callOpenAIChat([
-        {
-          role: 'system',
-          content: `${systemPrompt} The user currently feels ${mood}. Their rank is ${context.rank}. They have ${context.activeTasks} active tasks and ${context.completedTasks} completed tasks. If helpful, reference their recent task: ${context.recentTasks?.[0] || 'none'}.` ,
-        },
+      const recentAIReplies = extractRecentAIReplies(messages as { role: 'system' | 'user' | 'assistant'; content: string }[], 5);
+
+      const antiRepeatInstruction =
+        'IMPORTANT: Never repeat or closely echo anything you have already said in this conversation. ' +
+        'If the user asks the same question again, answer from a completely different angle. ' +
+        'Keep your reply under 150 words. Avoid filler phrases and unnecessary repetition.';
+
+      const systemPrompt = `${basePersonalityInstruction} ${antiRepeatInstruction} The user currently feels ${mood}. Their rank is ${context.rank}. They have ${context.activeTasks} active tasks and ${context.completedTasks} completed tasks. If helpful, reference their recent task: ${context.recentTasks?.[0] || 'none'}.`;
+
+      if (!process.env.OPENAI_API_KEY) {
+        return NextResponse.json({ response: getFallbackChatReply(mood, personality, lastUserMessage, context, recentAIReplies) });
+      }
+
+      let responseText = await callOpenAIChat([
+        { role: 'system', content: systemPrompt },
         ...messages.slice(-10),
       ]);
 
-      if (!process.env.OPENAI_API_KEY) {
-        return NextResponse.json({ response: getFallbackChatReply(mood, personality, lastUserMessage, context) });
-      }
-
       if (!responseText) {
-        return NextResponse.json({ response: getFallbackChatReply(mood, personality, lastUserMessage, context) });
+        return NextResponse.json({ response: getFallbackChatReply(mood, personality, lastUserMessage, context, recentAIReplies) });
       }
 
-      return NextResponse.json({ response: responseText });
+      // Similarity check — if the response is too close to a recent reply, regenerate once
+      if (isRepetitive(responseText, recentAIReplies)) {
+        const rephraseInstruction = `${antiRepeatInstruction} The previous reply was too similar to an earlier one. Rephrase the answer using completely different wording and a fresh angle.`;
+        const retryText = await callOpenAIChat(
+          [
+            { role: 'system', content: `${basePersonalityInstruction} ${rephraseInstruction}` },
+            ...messages.slice(-10),
+          ],
+          0.9
+        );
+
+        if (retryText && !isRepetitive(retryText, recentAIReplies)) {
+          responseText = retryText;
+        } else if (!retryText) {
+          return NextResponse.json({ response: getFallbackChatReply(mood, personality, lastUserMessage, context, recentAIReplies) });
+        } else {
+          // Both attempts were similar — acknowledge and redirect
+          responseText = `Let's try a different approach — I notice we've covered this ground before. ${retryText}`;
+        }
+      }
+
+      return NextResponse.json({ response: trimToWordLimit(responseText, 200) });
     }
 
     const mood = String(body.mood || 'focused');
