@@ -16,12 +16,21 @@ import { useTaskContext } from '@/context/TaskContext';
 const CATEGORIES = ['Work', 'Personal', 'Shopping', 'Health', 'Finance', 'Education', 'Other'];
 const PRIORITIES = ['low', 'medium', 'high', 'urgent'];
 
+const energyByPriority: Record<string, number> = {
+  low: 1,
+  medium: 2,
+  high: 3,
+  urgent: 4,
+};
+
 export function TaskForm() {
   const { addTask, loading } = useTaskContext();
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [selectedPriority, setSelectedPriority] = useState<string | null>(null);
+  const [scheduledDate, setScheduledDate] = useState<string>('');
+  const [scheduledTime, setScheduledTime] = useState<string>('');
   const [error, setError] = useState<string | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
 
@@ -38,11 +47,16 @@ export function TaskForm() {
 
     try {
       // Create task with AI analysis
+      const energy = (selectedPriority && energyByPriority[selectedPriority]) || 0;
+
       const newTask = await addTask({
         title: title.trim(),
         description: description.trim() || undefined,
         category: selectedCategory || undefined,
         priority: (selectedPriority as 'low' | 'medium' | 'high' | 'urgent') || undefined,
+        energy,
+        scheduledDate: scheduledDate || undefined,
+        scheduledTime: scheduledTime || undefined,
         status: 'todo',
         tags: [],
       });
@@ -111,6 +125,41 @@ export function TaskForm() {
                   <TextField {...params} label="Priority" />
                 )}
               />
+            </Stack>
+
+            <Stack direction="row" spacing={2}>
+              <TextField
+                label="Schedule Date"
+                type="date"
+                value={scheduledDate}
+                onChange={(e) => setScheduledDate(e.target.value)}
+                disabled={loading || isAnalyzing}
+                InputLabelProps={{ shrink: true }}
+                sx={{ flex: 1 }}
+              />
+
+              <TextField
+                label="Time (Optional)"
+                type="time"
+                value={scheduledTime}
+                onChange={(e) => setScheduledTime(e.target.value)}
+                disabled={loading || isAnalyzing}
+                InputLabelProps={{ shrink: true }}
+                sx={{ flex: 1 }}
+              />
+            </Stack>
+
+            <Stack direction="row" spacing={2} alignItems="center">
+              <TextField
+                label="Energy Cost"
+                value={(selectedPriority && energyByPriority[selectedPriority]) ?? 0}
+                InputProps={{ readOnly: true }}
+                disabled
+                sx={{ width: 140 }}
+              />
+              <div style={{ alignSelf: 'center', color: '#9e9e9e', fontSize: 13 }}>
+                Energy reflects estimated effort for the selected priority.
+              </div>
             </Stack>
 
             {error && <Alert severity="error">{error}</Alert>}

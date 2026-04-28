@@ -145,8 +145,6 @@ export function LegacyDashboard() {
 
   const [title, setTitle] = useState('');
   const [difficulty, setDifficulty] = useState<Difficulty>('easy');
-  const [scheduledDate, setScheduledDate] = useState('');
-  const [scheduledTime, setScheduledTime] = useState('');
   const [description, setDescription] = useState('');
   const [isSaving, setIsSaving] = useState(false);
 
@@ -218,8 +216,6 @@ export function LegacyDashboard() {
     title: string;
     description?: string;
     difficulty: Difficulty;
-    scheduledDate?: string;
-    scheduledTime?: string;
     source?: 'AI' | 'USER';
   }) => {
     const response = await fetch('/api/tasks', {
@@ -232,8 +228,7 @@ export function LegacyDashboard() {
         difficulty: taskPayload.difficulty,
         energy: energyByDifficulty[taskPayload.difficulty],
         source: taskPayload.source || 'USER',
-        scheduledDate: taskPayload.scheduledDate,
-        scheduledTime: taskPayload.scheduledTime,
+        // removed scheduledDate/scheduledTime from dashboard form
       }),
     });
 
@@ -257,16 +252,13 @@ export function LegacyDashboard() {
         title: title.trim(),
         description: description.trim() || undefined,
         difficulty,
-        scheduledDate: scheduledDate || undefined,
-        scheduledTime: scheduledTime || undefined,
         source: 'USER',
       });
 
       setTitle('');
       setDescription('');
       setDifficulty('easy');
-      setScheduledDate('');
-      setScheduledTime('');
+      // scheduling removed from dashboard form
     } catch (error) {
       setTaskError(error instanceof Error ? error.message : 'Failed to create task.');
     } finally {
@@ -449,31 +441,11 @@ export function LegacyDashboard() {
                 </label>
               </div>
 
-              <div className="mt-4 grid gap-4 md:grid-cols-2">
-                <label className="grid gap-2 text-sm font-medium text-slate-200 md:col-span-2">
-                  Schedule Date
-                  <input
-                    type="date"
-                    value={scheduledDate}
-                    onChange={(event) => setScheduledDate(event.target.value)}
-                    className="h-12 rounded-2xl border border-white/8 bg-[#040816] px-4 text-slate-100 outline-none transition focus:border-orange-400/70"
-                  />
-                </label>
-
-                <label className="grid gap-2 text-sm font-medium text-slate-200 md:col-span-2">
-                  Time (Optional)
-                  <input
-                    type="time"
-                    value={scheduledTime}
-                    onChange={(event) => setScheduledTime(event.target.value)}
-                    className="h-12 rounded-2xl border border-white/8 bg-[#040816] px-4 text-slate-100 outline-none transition focus:border-orange-400/70"
-                  />
-                </label>
-
+              <div className="mt-4">
                 <button
                   type="submit"
                   disabled={isSaving || !title.trim()}
-                  className="md:col-span-2 h-11 rounded-full bg-orange-500 px-7 text-sm font-semibold text-slate-950 transition hover:bg-orange-400 disabled:cursor-not-allowed disabled:opacity-60"
+                  className="h-11 rounded-full bg-orange-500 px-7 text-sm font-semibold text-slate-950 transition hover:bg-orange-400 disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   {isSaving ? 'Adding...' : 'Add task'}
                 </button>
