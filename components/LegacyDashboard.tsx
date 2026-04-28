@@ -417,6 +417,9 @@ export function LegacyDashboard() {
     await loadTasks();
   };
 
+  const canRegenerate =
+    !isChatting && chatMessages[chatMessages.length - 1]?.role === 'assistant';
+
   return (
     <main className="min-h-screen bg-[radial-gradient(circle_at_top_left,_rgba(249,115,22,0.22),_transparent_30%),radial-gradient(circle_at_top_right,_rgba(251,146,60,0.12),_transparent_24%),linear-gradient(180deg,_#080808_0%,_#000000_100%)] px-4 py-4 text-slate-100 sm:px-6 lg:px-8">
       <div className="mx-auto flex w-full max-w-[1280px] flex-col gap-5">
@@ -626,7 +629,7 @@ export function LegacyDashboard() {
                 <button
                   type="button"
                   onClick={() => void handleRegenerateChat()}
-                  disabled={isChatting || chatMessages[chatMessages.length - 1]?.role !== 'assistant'}
+                  disabled={!canRegenerate}
                   className="rounded-full border border-orange-400/20 bg-orange-400/10 px-7 py-3 text-sm font-semibold text-orange-200 transition hover:bg-orange-400/20 disabled:cursor-not-allowed disabled:opacity-40"
                 >
                   Regenerate response

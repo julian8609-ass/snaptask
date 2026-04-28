@@ -290,12 +290,12 @@ export async function POST(request: Request) {
           ? 'You are SnapTask AI, a playful friend. Keep replies warm, conversational, and lightly humorous.'
           : 'You are SnapTask AI, a calm mentor. Keep replies warm, conversational, and supportive.';
 
-      const recentAIReplies = extractRecentAIReplies(messages as { role: 'system' | 'user' | 'assistant'; content: string }[], 5);
+      const recentAIReplies = extractRecentAIReplies(messages, 5);
 
       const antiRepeatInstruction =
         'IMPORTANT: Never repeat or closely echo anything you have already said in this conversation. ' +
         'If the user asks the same question again, answer from a completely different angle. ' +
-        'Keep your reply under 150 words. Avoid filler phrases and unnecessary repetition.';
+        'Keep your reply under 200 words. Avoid filler phrases and unnecessary repetition.';
 
       const systemPrompt = `${basePersonalityInstruction} ${antiRepeatInstruction} The user currently feels ${mood}. Their rank is ${context.rank}. They have ${context.activeTasks} active tasks and ${context.completedTasks} completed tasks. If helpful, reference their recent task: ${context.recentTasks?.[0] || 'none'}.`;
 
@@ -314,7 +314,7 @@ export async function POST(request: Request) {
 
       // Similarity check — if the response is too close to a recent reply, regenerate once
       if (isRepetitive(responseText, recentAIReplies)) {
-        const rephraseInstruction = `${antiRepeatInstruction} The previous reply was too similar to an earlier one. Rephrase the answer using completely different wording and a fresh angle.`;
+        const rephraseInstruction = `${antiRepeatInstruction} Your last reply was flagged as too similar to a previous one — use completely different wording and a fresh angle this time.`;
         const retryText = await callOpenAIChat(
           [
             { role: 'system', content: `${basePersonalityInstruction} ${rephraseInstruction}` },

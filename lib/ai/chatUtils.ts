@@ -8,7 +8,8 @@ export type ChatMessage = {
 };
 
 /**
- * Tokenize text into a set of lowercase words (punctuation stripped).
+ * Tokenize text into a set of lowercase words (ASCII punctuation stripped).
+ * Non-ASCII characters (accented letters, CJK, etc.) are preserved as-is.
  */
 export function tokenize(text: string): Set<string> {
   return new Set(
@@ -65,6 +66,11 @@ export function extractRecentAIReplies(
 /**
  * Trim a response to a maximum word count while keeping complete sentences.
  */
+/** Minimum fraction of the truncated string that must precede a sentence-ending
+ *  punctuation mark before we use that boundary. Values below 0.6 risk cutting
+ *  so early that the response becomes unintelligible. */
+const MIN_SENTENCE_COMPLETION_RATIO = 0.6;
+
 export function trimToWordLimit(text: string, maxWords = 200): string {
   const words = text.trim().split(/\s+/);
   if (words.length <= maxWords) return text.trim();
@@ -77,7 +83,7 @@ export function trimToWordLimit(text: string, maxWords = 200): string {
     truncated.lastIndexOf('?')
   );
 
-  if (lastSentenceEnd > truncated.length * 0.6) {
+  if (lastSentenceEnd > truncated.length * MIN_SENTENCE_COMPLETION_RATIO) {
     return truncated.slice(0, lastSentenceEnd + 1);
   }
 
