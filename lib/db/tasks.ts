@@ -1,4 +1,4 @@
-import supabase from '@/lib/db/supabase';
+import { getSupabaseServer } from '@/lib/db/supabase';
 import db from '@/lib/db';
 import { Task, Subtask, Reminder, User } from '@/types';
 

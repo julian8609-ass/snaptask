@@ -1,4 +1,5 @@
-import { getSupabaseClient } from '../../lib/supabase';
+import { getSupabaseClient } from '../../lib/supabase-safe';
+
 
 import { createClient } from '@supabase/supabase-js';
 
