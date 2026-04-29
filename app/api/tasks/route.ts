@@ -1,7 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
-import { prisma } from '@/lib/prisma';
+import { createClient } from '@supabase/supabase-js';
+
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+if (!supabaseUrl || !supabaseServiceKey) {
+  console.error('Missing Supabase environment variables');
+}
+
+const supabase = createClient(supabaseUrl || '', supabaseServiceKey || '');
 
 const xpByDifficulty = {
   easy: 10,
@@ -11,80 +18,76 @@ const xpByDifficulty = {
 
 export async function GET(request: NextRequest) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user?.email) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    const url = new URL(request.url);
+    const userId = url.searchParams.get('userId');
+    
+    console.log('Tasks API - Received userId:', userId);
+
+    if (!userId) {
+      console.error('userId is missing');
+      return NextResponse.json({ error: 'userId required' }, { status: 400 });
     }
 
-    const user = await prisma.user.findUnique({
-      where: { email: session.user.email },
-    });
-    if (!user) {
-      return NextResponse.json({ error: 'User not found' }, { status: 404 });
+    console.log('Fetching tasks for userId:', userId);
+    const { data: tasks, error } = await supabase
+      .from('tasks')
+      .select('*')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      console.error('Supabase error:', error.message, error.details);
+      return NextResponse.json(
+        { error: `Database error: ${error.message}` },
+        { status: 500 }
+      );
     }
 
-    const tasks = await prisma.task.findMany({
-      where: { userId: user.id },
-      orderBy: { createdAt: 'desc' },
-    });
-
-    return NextResponse.json(tasks);
+    console.log('Successfully fetched tasks:', tasks?.length || 0);
+    return NextResponse.json(tasks || []);
   } catch (error) {
-    return NextResponse.json({ error: 'Failed to fetch tasks' }, { status: 500 });
+    console.error('Error fetching tasks:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    return NextResponse.json({ error: `Server error: ${errorMessage}` }, { status: 500 });
   }
 }
 
 export async function POST(request: NextRequest) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user?.email) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
     const body = await request.json();
-    const user = await prisma.user.findUnique({ where: { email: session.user.email } });
-    if (!user) {
-      return NextResponse.json({ error: 'User not found' }, { status: 404 });
+    const { userId, title, description, priority, dueDate } = body;
+
+    console.log('Creating task for userId:', userId, 'title:', title);
+
+    if (!userId || !title) {
+      return NextResponse.json({ error: 'userId and title required' }, { status: 400 });
     }
 
-    const title = String(body.title || '').trim();
-    if (!title) {
-      return NextResponse.json({ error: 'Task title is required' }, { status: 400 });
+    const { data: task, error } = await supabase
+      .from('tasks')
+      .insert([
+        {
+          user_id: userId,
+          title: String(title).trim(),
+          description: description ? String(description).trim() : null,
+          priority: priority || 'medium',
+          status: 'todo',
+          due_date: dueDate || null,
+          xp_reward: xpByDifficulty[priority as keyof typeof xpByDifficulty] ?? 10,
+        },
+      ])
+      .select();
+
+    if (error) {
+      console.error('Supabase error:', error.message, error.details);
+      return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
-    const difficulty = body.difficulty || 'easy';
-    const energy = Number(body.energy || (difficulty === 'hard' ? 3 : difficulty === 'medium' ? 2 : 1));
-    const source = body.source === 'AI' ? 'AI' : 'USER';
-
-    // Parse scheduled date properly
-    let scheduledDate = null;
-    if (body.scheduledDate) {
-      const dateStr = String(body.scheduledDate).trim();
-      if (dateStr) {
-        // Handle YYYY-MM-DD format from date input
-        const [year, month, day] = dateStr.split('-');
-        scheduledDate = new Date(Number(year), Number(month) - 1, Number(day));
-      }
-    }
-
-    const task = await prisma.task.create({
-      data: {
-        title,
-        description: String(body.description || '').trim() || null,
-        difficulty,
-        energy,
-        source,
-        xp: xpByDifficulty[difficulty as keyof typeof xpByDifficulty] ?? 10,
-        userId: user.id,
-        scheduledDate,
-        scheduledTime: String(body.scheduledTime || '').trim() || null,
-      },
-    });
-
-    return NextResponse.json(task, { status: 201 });
+    console.log('Task created successfully');
+    return NextResponse.json(task?.[0], { status: 201 });
   } catch (error) {
     console.error('Task creation error:', error);
-    const errorMessage = error instanceof Error ? error.message : 'Failed to create task';
-    return NextResponse.json({ error: errorMessage }, { status: 500 });
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    return NextResponse.json({ error: `Server error: ${errorMessage}` }, { status: 500 });
   }
 }

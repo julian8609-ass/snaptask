@@ -1,7 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
-import { prisma } from '@/lib/prisma';
+import { createClient } from '@supabase/supabase-js';
+
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+const supabase = createClient(supabaseUrl!, supabaseServiceKey!);
 
 type Params = {
   params: { id: string } | Promise<{ id: string }>;
@@ -9,85 +12,120 @@ type Params = {
 
 export async function GET(request: NextRequest, { params }: Params) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user?.email) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
     const resolvedParams = await params;
-    const userId = (session.user as any)?.id as string | undefined;
+    const url = new URL(request.url);
+    const userId = url.searchParams.get('userId');
+
     if (!userId) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return NextResponse.json({ error: 'userId required' }, { status: 400 });
     }
 
-    const task = await prisma.task.findUnique({ where: { id: resolvedParams.id } });
-    if (!task || task.userId !== userId) {
+    const { data: task, error } = await supabase
+      .from('tasks')
+      .select('*')
+      .eq('id', resolvedParams.id)
+      .eq('user_id', userId)
+      .single();
+
+    if (error || !task) {
+      console.error('Task error:', error);
       return NextResponse.json({ error: 'Task not found' }, { status: 404 });
     }
+
     return NextResponse.json(task);
   } catch (error) {
+    console.error('Get task error:', error);
     return NextResponse.json({ error: 'Failed to fetch task' }, { status: 500 });
   }
 }
 
 export async function PATCH(request: NextRequest, { params }: Params) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user?.email) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
     const resolvedParams = await params;
-    const userId = (session.user as any)?.id as string | undefined;
+    const url = new URL(request.url);
+    const userId = url.searchParams.get('userId');
+    const body = await request.json();
+
     if (!userId) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return NextResponse.json({ error: 'userId required' }, { status: 400 });
     }
 
-    const body = await request.json();
-    const task = await prisma.task.findUnique({ where: { id: resolvedParams.id } });
-    if (!task || task.userId !== userId) {
+    // Verify task belongs to user
+    const { data: task, error: taskError } = await supabase
+      .from('tasks')
+      .select('*')
+      .eq('id', resolvedParams.id)
+      .eq('user_id', userId)
+      .single();
+
+    if (taskError || !task) {
+      console.error('Task error:', taskError);
       return NextResponse.json({ error: 'Task not found' }, { status: 404 });
     }
 
-    const updated = await prisma.task.update({
-      where: { id: resolvedParams.id },
-      data: {
+    // Update task
+    const { data: updated, error: updateError } = await supabase
+      .from('tasks')
+      .update({
         title: body.title ?? task.title,
         description: body.description ?? task.description,
         status: body.status ?? task.status,
-        difficulty: body.difficulty ?? task.difficulty,
-        energy: body.energy ?? task.energy,
-        skipCount: body.skipCount ?? task.skipCount,
-      },
-    });
+        priority: body.priority ?? task.priority,
+        due_date: body.due_date ?? task.due_date,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', resolvedParams.id)
+      .select();
 
-    return NextResponse.json(updated);
+    if (updateError) {
+      console.error('Update error:', updateError);
+      return NextResponse.json({ error: updateError.message }, { status: 500 });
+    }
+
+    return NextResponse.json(updated?.[0]);
   } catch (error) {
+    console.error('Patch task error:', error);
     return NextResponse.json({ error: 'Failed to update task' }, { status: 500 });
   }
 }
 
 export async function DELETE(request: NextRequest, { params }: Params) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user?.email) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
     const resolvedParams = await params;
-    const userId = (session.user as any)?.id as string | undefined;
+    const url = new URL(request.url);
+    const userId = url.searchParams.get('userId');
+
     if (!userId) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return NextResponse.json({ error: 'userId required' }, { status: 400 });
     }
 
-    const task = await prisma.task.findUnique({ where: { id: resolvedParams.id } });
-    if (!task || task.userId !== userId) {
+    // Verify task belongs to user
+    const { data: task, error: taskError } = await supabase
+      .from('tasks')
+      .select('*')
+      .eq('id', resolvedParams.id)
+      .eq('user_id', userId)
+      .single();
+
+    if (taskError || !task) {
+      console.error('Task error:', taskError);
       return NextResponse.json({ error: 'Task not found' }, { status: 404 });
     }
 
-    await prisma.task.delete({ where: { id: resolvedParams.id } });
+    // Delete task
+    const { error: deleteError } = await supabase
+      .from('tasks')
+      .delete()
+      .eq('id', resolvedParams.id);
+
+    if (deleteError) {
+      console.error('Delete error:', deleteError);
+      return NextResponse.json({ error: deleteError.message }, { status: 500 });
+    }
+
     return NextResponse.json({ success: true });
   } catch (error) {
+    console.error('Delete task error:', error);
     return NextResponse.json({ error: 'Failed to delete task' }, { status: 500 });
   }
 }

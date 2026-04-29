@@ -51,11 +51,14 @@ export interface AISuggestion {
 
 export interface Reminder {
   id: string;
-  task_id: string;
   user_id: string;
-  remind_at: string; // ISO string
-  type: 'email' | 'notification' | 'in_app';
-  status: 'pending' | 'sent' | 'dismissed';
+  task_id?: string;
+  event_id?: string;
+  title: string;
+  description?: string;
+  reminder_time: string; // ISO string
+  reminder_type: 'notification' | 'email' | 'sms';
+  is_sent: boolean;
   created_at: string;
 }
 

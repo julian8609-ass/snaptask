@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   TextField,
   Button,
@@ -10,11 +10,21 @@ import {
   Alert,
   Stack,
   Autocomplete,
+  Box,
+  Typography,
+  Chip,
 } from '@mui/material';
 import { useTaskContext } from '@/context/TaskContext';
 
 const CATEGORIES = ['Work', 'Personal', 'Shopping', 'Health', 'Finance', 'Education', 'Other'];
 const PRIORITIES = ['low', 'medium', 'high', 'urgent'];
+
+const energyByPriority: Record<string, number> = {
+  low: 1,
+  medium: 2,
+  high: 3,
+  urgent: 4,
+};
 
 export function TaskForm() {
   const { addTask, loading } = useTaskContext();
@@ -24,6 +34,11 @@ export function TaskForm() {
   const [selectedPriority, setSelectedPriority] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
+
+  // Calculate energy cost based on priority
+  const energyCost = useMemo(() => {
+    return selectedPriority ? energyByPriority[selectedPriority] : 0;
+  }, [selectedPriority]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -45,6 +60,7 @@ export function TaskForm() {
         priority: (selectedPriority as 'low' | 'medium' | 'high' | 'urgent') || undefined,
         status: 'todo',
         tags: [],
+        energy: energyCost || undefined,
       });
 
       if (newTask) {
@@ -112,6 +128,36 @@ export function TaskForm() {
                 )}
               />
             </Stack>
+
+            {energyCost > 0 && (
+              <Box
+                sx={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 1.5,
+                  p: 1.5,
+                  backgroundColor: '#fff3e0',
+                  borderRadius: 1,
+                  border: '1px solid #ffe0b2',
+                }}
+              >
+                <Typography variant="subtitle2" sx={{ color: '#e65100', fontWeight: 600 }}>
+                  Estimated Energy Cost:
+                </Typography>
+                <Chip
+                  label={`${energyCost} energy`}
+                  size="small"
+                  sx={{
+                    backgroundColor: '#f97316',
+                    color: 'white',
+                    fontWeight: 'bold',
+                    '& .MuiChip-label': {
+                      px: 1.5,
+                    },
+                  }}
+                />
+              </Box>
+            )}
 
             {error && <Alert severity="error">{error}</Alert>}
 

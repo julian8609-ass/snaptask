@@ -1,60 +1,43 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
+import { chatWithAssistant, ChatMessage } from '@/lib/ai/gemini';
 
-async function callOpenAIChat(prompt: string) {
-  const key = process.env.OPENAI_API_KEY;
-  if (!key) {
-    console.error('OPENAI_API_KEY is not set.');
-    return null;
-  }
+export const maxDuration = 60;
 
-  try {
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${key}`,
-      },
-      body: JSON.stringify({
-        model: 'gpt-3.5-turbo',
-        messages: [
-          { role: 'system', content: 'You are a helpful assistant.' },
-          { role: 'user', content: prompt },
-        ],
-        max_tokens: 500,
-      }),
-    });
-
-    if (!response.ok) {
-      console.error('OpenAI API error:', await response.text());
-      return null;
-    }
-
-    const json = await response.json();
-    return json?.choices?.[0]?.message?.content || null;
-  } catch (error) {
-    console.error('Error calling OpenAI API:', error);
-    return null;
-  }
+interface ChatRequest {
+  message: string;
+  history?: ChatMessage[];
 }
 
-export async function POST(request: Request) {
+/**
+ * POST /api/ai/chat
+ * Send a message to the AI assistant and get a response with optional task detection
+ */
+export async function POST(request: NextRequest) {
   try {
-    const body = await request.json();
-    const prompt = body.prompt;
+    const body: ChatRequest = await request.json();
+    const { message, history } = body;
 
-    if (!prompt) {
-      return NextResponse.json({ error: 'Prompt is required.' }, { status: 400 });
+    // Validate input
+    if (!message || typeof message !== 'string') {
+      return NextResponse.json({ error: 'Message is required' }, { status: 400 });
     }
 
-    const response = await callOpenAIChat(prompt);
-
-    if (!response) {
-      return NextResponse.json({ error: 'Failed to get a response from AI.' }, { status: 500 });
+    if (message.length > 5000) {
+      return NextResponse.json({ error: 'Message too long' }, { status: 400 });
     }
 
-    return NextResponse.json({ response });
+    // Get AI response with task detection
+    const response = await chatWithAssistant(message, history || []);
+
+    return NextResponse.json({
+      success: true,
+      data: response,
+    });
   } catch (error) {
-    console.error('Error in AI chat API:', error);
-    return NextResponse.json({ error: 'Internal server error.' }, { status: 500 });
+    console.error('Chat API error:', error);
+    return NextResponse.json(
+      { error: 'Failed to process message', details: error instanceof Error ? error.message : 'Unknown error' },
+      { status: 500 }
+    );
   }
 }

@@ -1,7 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
-import { prisma } from '@/lib/prisma';
+import { createClient } from '@supabase/supabase-js';
+
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+const supabase = createClient(supabaseUrl!, supabaseServiceKey!);
 
 const rankThresholds = [
   { xp: 1500, rank: 'Master' },
@@ -17,23 +20,36 @@ function computeRank(xp: number) {
 
 export async function POST(request: NextRequest) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user?.email) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
     const body = await request.json();
-    const taskId = String(body.taskId || '');
-    const action = String(body.action || 'complete');
+    const { userId, taskId, action } = body;
 
-    const user = await prisma.user.findUnique({ where: { email: session.user.email } });
-    if (!user) {
-      return NextResponse.json({ error: 'User not found' }, { status: 404 });
+    if (!userId || !taskId) {
+      return NextResponse.json({ error: 'userId and taskId required' }, { status: 400 });
     }
 
-    const task = await prisma.task.findUnique({ where: { id: taskId } });
-    if (!task || task.userId !== user.id) {
+    // Get task
+    const { data: task, error: taskError } = await supabase
+      .from('tasks')
+      .select('*')
+      .eq('id', taskId)
+      .eq('user_id', userId)
+      .single();
+
+    if (taskError || !task) {
+      console.error('Task error:', taskError);
       return NextResponse.json({ error: 'Task not found' }, { status: 404 });
+    }
+
+    // Get user profile
+    const { data: userProfile, error: profileError } = await supabase
+      .from('user_profiles')
+      .select('*')
+      .eq('user_id', userId)
+      .single();
+
+    if (profileError) {
+      console.error('Profile error:', profileError);
+      return NextResponse.json({ error: 'User profile not found' }, { status: 404 });
     }
 
     if (action === 'complete') {
@@ -41,52 +57,80 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: 'Task already completed' }, { status: 400 });
       }
 
-      const today = new Date();
-      const lastCompleted = user.lastCompletedAt ? new Date(user.lastCompletedAt) : null;
-      const isYesterday = lastCompleted
-        ? new Date(today.getFullYear(), today.getMonth(), today.getDate() - 1).getTime() ===
-          new Date(lastCompleted.getFullYear(), lastCompleted.getMonth(), lastCompleted.getDate()).getTime()
+      const today = new Date().toISOString().split('T')[0];
+      const lastActivityDate = userProfile.last_activity_date ? new Date(userProfile.last_activity_date) : null;
+      const todayDate = new Date(today);
+      const isYesterday = lastActivityDate
+        ? new Date(
+            todayDate.getFullYear(),
+            todayDate.getMonth(),
+            todayDate.getDate() - 1
+          ).toISOString().split('T')[0] === userProfile.last_activity_date
         : false;
 
-      const streak = isYesterday ? user.streak + 1 : 1;
-      const xpAward = task.xp;
-      const newXp = user.xp + xpAward;
+      const streak = isYesterday ? (userProfile.streak_days || 0) + 1 : 1;
+      const xpAward = task.xp_reward || 10;
+      const newXp = (userProfile.total_xp || 0) + xpAward;
       const rank = computeRank(newXp);
-      const updatedEnergy = Math.min(5, user.energy + 1);
+      const newLevel = Math.floor(newXp / 500) + 1;
 
-      await prisma.task.update({
-        where: { id: task.id },
-        data: { status: 'completed' },
+      // Update task
+      await supabase
+        .from('tasks')
+        .update({
+          status: 'completed',
+          completed_at: new Date().toISOString(),
+        })
+        .eq('id', taskId);
+
+      // Log XP
+      await supabase
+        .from('xp_logs')
+        .insert([
+          {
+            user_id: userId,
+            task_id: taskId,
+            xp_amount: xpAward,
+            xp_type: 'task_completed',
+            description: `Completed task: ${task.title}`,
+          },
+        ]);
+
+      // Update user profile
+      const { data: updatedProfile } = await supabase
+        .from('user_profiles')
+        .update({
+          total_xp: newXp,
+          streak_days: streak,
+          level: newLevel,
+          last_activity_date: today,
+        })
+        .eq('user_id', userId)
+        .select();
+
+      return NextResponse.json({
+        task: { ...task, status: 'completed' },
+        profile: updatedProfile?.[0],
+        xpAwarded: xpAward,
+        rank,
       });
-
-      const updatedUser = await prisma.user.update({
-        where: { id: user.id },
-        data: {
-          xp: newXp,
-          streak,
-          rank,
-          lastCompletedAt: today,
-          energy: updatedEnergy,
-        },
-      });
-
-      return NextResponse.json({ task: { ...task, status: 'completed' }, profile: updatedUser });
     }
 
     if (action === 'skip') {
-      const skipped = await prisma.task.update({
-        where: { id: task.id },
-        data: {
-          skipCount: task.skipCount + 1,
-          title: task.title + ' (simplified)',
-          status: 'skipped',
-        },
-      });
-      return NextResponse.json({ task: skipped });
+      await supabase
+        .from('tasks')
+        .update({
+          status: 'todo',
+          description: (task.description || '') + ' (simplified)',
+        })
+        .eq('id', taskId);
+
+      return NextResponse.json({ task: { ...task, status: 'skipped' } });
     }
 
     return NextResponse.json({ error: 'Unknown action' }, { status: 400 });
   } catch (error) {
+    console.error('XP update error:', error);
     return NextResponse.json({ error: 'Failed to update XP' }, { status: 500 });
   }
 }

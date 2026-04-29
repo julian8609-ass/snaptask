@@ -2,6 +2,7 @@
 
 import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
 import { Task, TaskStats, Reminder } from '@/types';
+import { getDemoUserId } from '@/lib/user-utils';
 
 interface TaskContextType {
   tasks: Task[];
@@ -55,9 +56,9 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
     xp: tasks.reduce((total, task) => total + (task.xp || 0), 0),
   };
 
-  // Get user ID from localStorage or auth
+  // Get user ID from localStorage or generate demo UUID
   useEffect(() => {
-    const id = localStorage.getItem('userId') || 'demo-user';
+    const id = getDemoUserId();
     setUserId(id);
   }, []);
 
@@ -67,12 +68,18 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
     try {
       setLoading(true);
       const response = await fetch(`/api/tasks?userId=${encodeURIComponent(userId)}`);
-      if (!response.ok) throw new Error('Failed to fetch tasks');
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error(`Failed to fetch tasks: ${response.status} ${errorText}`);
+        throw new Error('Failed to fetch tasks');
+      }
       const data: Task[] = await response.json();
       setTasks(data);
       setError(null);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to fetch tasks');
+      const errorMessage = err instanceof Error ? err.message : 'Failed to fetch tasks';
+      setError(errorMessage);
+      console.error('Tasks fetch error:', errorMessage);
     } finally {
       setLoading(false);
     }
@@ -83,7 +90,11 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
     if (!userId) return;
     try {
       const response = await fetch(`/api/reminders?userId=${encodeURIComponent(userId)}`);
-      if (!response.ok) throw new Error('Failed to fetch reminders');
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error(`Failed to fetch reminders: ${response.status} ${errorText}`);
+        throw new Error(`Failed to fetch reminders: ${response.status}`);
+      }
       const data: Reminder[] = await response.json();
       setReminders(data);
     } catch (err) {
@@ -99,10 +110,20 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
         const response = await fetch('/api/tasks', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ ...task, user_id: userId }),
+          body: JSON.stringify({
+            userId,
+            title: task.title,
+            description: task.description,
+            priority: task.priority || 'medium',
+            dueDate: task.due_date,
+          }),
         });
 
-        if (!response.ok) throw new Error('Failed to create task');
+        if (!response.ok) {
+          const error = await response.text();
+          console.error('API Error:', error);
+          throw new Error('Failed to create task');
+        }
         const newTask = await response.json();
         setTasks((prev) => [...prev, newTask]);
         return newTask;
@@ -116,8 +137,9 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
 
   // Update task status
   const updateTaskStatus = useCallback(async (taskId: string, status: Task['status']) => {
+    if (!userId) return;
     try {
-      const response = await fetch(`/api/tasks/${taskId}`, {
+      const response = await fetch(`/api/tasks/${taskId}?userId=${encodeURIComponent(userId)}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status }),
@@ -128,12 +150,13 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to update task');
     }
-  }, [refreshTasks]);
+  }, [refreshTasks, userId]);
 
   // Delete task
   const deleteTaskById = useCallback(async (taskId: string) => {
+    if (!userId) return;
     try {
-      const response = await fetch(`/api/tasks/${taskId}`, {
+      const response = await fetch(`/api/tasks/${taskId}?userId=${encodeURIComponent(userId)}`, {
         method: 'DELETE',
       });
 
@@ -142,7 +165,7 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to delete task');
     }
-  }, []);
+  }, [userId]);
 
   // Complete task
   const completeTask = useCallback(
