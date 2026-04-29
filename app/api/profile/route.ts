@@ -13,10 +13,7 @@ function computeRank(xp: number) {
 }
 
 function getSupabase() {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
-  const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
-  // @ts-ignore
-  return createClient(supabaseUrl as string, supabaseServiceKey as string);
+  return getSupabaseClient();
 }
 
 export async function GET(request: NextRequest) {
