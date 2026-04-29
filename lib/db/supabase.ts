@@ -1,15 +1,31 @@
 import { getSupabaseClient } from '../../lib/supabase';
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
+import { createClient } from '@supabase/supabase-js';
 
-// Client for browser/client-side operations
+// Lazy server-side Supabase client factory (prevents build-time errors)
+let cachedSupabaseServer: any = null;
+
+export function getSupabaseServer() {
+  if (cachedSupabaseServer) return cachedSupabaseServer;
+
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+  if (!supabaseUrl || !supabaseServiceKey) {
+    console.warn('Supabase server client not configured');
+    cachedSupabaseServer = getSupabaseClient(); // fallback
+    return cachedSupabaseServer;
+  }
+
+  try {
+    cachedSupabaseServer = createClient(supabaseUrl, supabaseServiceKey);
+  } catch (error) {
+    console.error('Failed to create Supabase server client:', error);
+    cachedSupabaseServer = getSupabaseClient();
+  }
+  return cachedSupabaseServer;
+}
+
+// Client for browser/client-side operations (unchanged)
 export const supabase = getSupabaseClient();
-
-// Server-side client (if needed for server routes)
-export const supabaseServer = supabaseServiceKey
-  ? createClient(supabaseUrl, supabaseServiceKey)
-  : supabase;
-
 export default supabase;

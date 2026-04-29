@@ -2,10 +2,28 @@
 
 import { getSupabaseClient } from './supabase';
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
+import { createClient as createServiceClient } from '@supabase/supabase-js';
 
 export const supabase = getSupabaseClient();
+
+// Server-side admin client factory (lazy, avoids build-time errors)
+let cachedSupabaseAdmin: any = null;
+
+export function getSupabaseAdmin() {
+  if (cachedSupabaseAdmin) return cachedSupabaseAdmin;
+
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+  if (!supabaseUrl || !supabaseServiceKey) {
+    console.warn('Supabase admin not configured (missing URL or service key)');
+    cachedSupabaseAdmin = null;
+    return null;
+  }
+
+  cachedSupabaseAdmin = createServiceClient(supabaseUrl, supabaseServiceKey);
+  return cachedSupabaseAdmin;
+}
 
 // Example: Insert a task with proper authentication
 export async function insertTask(
@@ -41,21 +59,13 @@ export async function insertTask(
   }
 }
 
-// Example: Insert with Service Role Key (server-side only!)
-// This bypasses RLS - use only on backend for admin operations
-import { createClient as createServiceClient } from '@supabase/supabase-js';
-
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-
-export const supabaseAdmin = supabaseServiceKey
-  ? createServiceClient(supabaseUrl, supabaseServiceKey)
-  : null;
-
+// Updated admin insert function
 export async function insertTaskAdmin(
   userId: string,
   title: string,
   description: string
 ) {
+  const supabaseAdmin = getSupabaseAdmin();
   if (!supabaseAdmin) {
     throw new Error('Service role key not configured');
   }
