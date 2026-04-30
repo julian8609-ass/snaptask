@@ -187,7 +187,8 @@ export function LegacyDashboard() {
     setProfileError(null);
 
     try {
-      const response = await fetch('/api/profile', { credentials: 'include' });
+      const userId = getDemoUserId();
+      const response = await fetch(`/api/profile?userId=${encodeURIComponent(userId)}`, { credentials: 'include' });
       if (!response.ok) {
         throw new Error(response.status === 401 ? 'Sign in to load your profile.' : 'Failed to load profile.');
       }
