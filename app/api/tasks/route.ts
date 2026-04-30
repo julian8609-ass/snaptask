@@ -1,11 +1,48 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getSupabaseClient } from '@/lib/supabase';
+import { getSupabaseClient } from '@/lib/supabase-safe';
 
 const xpByDifficulty = {
   easy: 10,
   medium: 20,
   hard: 35,
 };
+
+const difficultyByPriority = {
+  low: 'easy',
+  medium: 'medium',
+  high: 'hard',
+  urgent: 'hard',
+} as const;
+
+const priorityByDifficulty = {
+  easy: 'low',
+  medium: 'medium',
+  hard: 'high',
+} as const;
+
+const energyByDifficulty = {
+  easy: 1,
+  medium: 2,
+  hard: 3,
+} as const;
+
+function normalizeTask(task: any) {
+  const priority = (task.priority || 'medium') as keyof typeof difficultyByPriority;
+  const difficulty = (task.difficulty || difficultyByPriority[priority] || 'medium') as 'easy' | 'medium' | 'hard';
+  const dueDate = task.due_date ?? null;
+
+  return {
+    ...task,
+    priority,
+    difficulty,
+    energy: task.energy ?? energyByDifficulty[difficulty] ?? 2,
+    xp: task.xp ?? task.xp_reward ?? xpByDifficulty[difficulty] ?? 10,
+    source: task.source ?? 'USER',
+    skipCount: task.skipCount ?? task.skip_count ?? 0,
+    scheduledDate: task.scheduledDate ?? dueDate,
+    scheduledTime: task.scheduledTime ?? null,
+  };
+}
 
 function getSupabase() {
   return getSupabaseClient();
@@ -40,7 +77,7 @@ export async function GET(request: NextRequest) {
     }
 
     console.log('Successfully fetched tasks:', tasks?.length || 0);
-    return NextResponse.json(tasks || []);
+    return NextResponse.json((tasks || []).map(normalizeTask));
   } catch (error) {
     console.error('Error fetching tasks:', error);
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
@@ -52,13 +89,19 @@ export async function POST(request: NextRequest) {
   try {
     const supabase = getSupabase();
     const body = await request.json();
-    const { userId, title, description, priority, dueDate } = body;
+    const { userId, title, description } = body;
 
     console.log('Creating task for userId:', userId, 'title:', title);
 
     if (!userId || !title) {
       return NextResponse.json({ error: 'userId and title required' }, { status: 400 });
     }
+
+    const difficulty = (body.difficulty || 'medium') as 'easy' | 'medium' | 'hard';
+    const priorityInput = (body.priority || priorityByDifficulty[difficulty] || 'medium') as keyof typeof difficultyByPriority;
+    const dueDate = body.dueDate || body.scheduledDate || null;
+    const energy = typeof body.energy === 'number' ? body.energy : energyByDifficulty[difficulty] ?? 2;
+    const xpReward = typeof body.xp === 'number' ? body.xp : typeof body.xp_reward === 'number' ? body.xp_reward : xpByDifficulty[difficulty] ?? 10;
 
     const { data: task, error } = await supabase
       .from('tasks')
@@ -67,10 +110,10 @@ export async function POST(request: NextRequest) {
           user_id: userId,
           title: String(title).trim(),
           description: description ? String(description).trim() : null,
-          priority: priority || 'medium',
+          priority: priorityInput,
           status: 'todo',
-          due_date: dueDate || null,
-          xp_reward: xpByDifficulty[priority as keyof typeof xpByDifficulty] ?? 10,
+          due_date: dueDate,
+          xp_reward: xpReward,
         },
       ])
       .select();
@@ -81,7 +124,7 @@ export async function POST(request: NextRequest) {
     }
 
     console.log('Task created successfully');
-    return NextResponse.json(task?.[0], { status: 201 });
+    return NextResponse.json(normalizeTask(task?.[0]), { status: 201 });
   } catch (error) {
     console.error('Task creation error:', error);
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';

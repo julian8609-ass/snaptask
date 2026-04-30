@@ -26,3 +26,5 @@ export function getSupabaseClient() {
   return cachedClient;
 }
 
+export default getSupabaseClient;
+

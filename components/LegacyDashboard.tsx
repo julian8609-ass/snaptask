@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 import { TaskCard } from '@/components/TaskCard';
 import { TaskCalendar } from '@/components/TaskCalendar';
+import { getDemoUserId } from '@/lib/user-utils';
 
 type Difficulty = 'easy' | 'medium' | 'hard';
 
@@ -166,7 +167,8 @@ export function LegacyDashboard() {
     setTaskError(null);
 
     try {
-      const response = await fetch('/api/tasks', { credentials: 'include' });
+      const userId = getDemoUserId();
+      const response = await fetch(`/api/tasks?userId=${encodeURIComponent(userId)}`, { credentials: 'include' });
       if (!response.ok) {
         throw new Error(response.status === 401 ? 'Sign in to load your tasks.' : 'Failed to load tasks.');
       }
@@ -220,11 +222,13 @@ export function LegacyDashboard() {
     scheduledTime?: string;
     source?: 'AI' | 'USER';
   }) => {
+    const userId = getDemoUserId();
     const response = await fetch('/api/tasks', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       credentials: 'include',
       body: JSON.stringify({
+        userId,
         title: taskPayload.title,
         description: taskPayload.description,
         difficulty: taskPayload.difficulty,

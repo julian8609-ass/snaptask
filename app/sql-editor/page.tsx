@@ -1,6 +1,6 @@
-'use client';
+export const dynamic = 'force-dynamic';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { createClient } from '@supabase/supabase-js';
 
 export default function SQLEditor() {
@@ -9,11 +9,30 @@ export default function SQLEditor() {
   const [error, setError] = useState<string>('');
   const [loading, setLoading] = useState(false);
   const [executionTime, setExecutionTime] = useState(0);
+  const [supabase, setSupabase] = useState<any>(null);
+  const [supabaseUrl, setSupabaseUrl] = useState<string>('');
 
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  useEffect(() => {
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+    
+    if (url && anonKey) {
+      setSupabaseUrl(url);
+      const client = createClient(url, anonKey);
+      setSupabase(client);
+    } else {
+      setSupabase({
+        rpc: () => Promise.resolve({ data: null, error: { message: 'Supabase not configured' } }),
+        from: () => ({
+          select: () => Promise.resolve({ data: [], error: { message: 'Supabase not configured' } }),
+        }),
+      });
+    }
+  }, []);
 
-  const supabase = createClient(supabaseUrl!, supabaseAnonKey!);
+  if (!supabase) {
+    return <div>Supabase loading...</div>;
+  }
 
   const executeQuery = async () => {
     if (!query.trim()) {
