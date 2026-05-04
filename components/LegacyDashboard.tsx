@@ -362,7 +362,7 @@ export function LegacyDashboard() {
   return (
     <main className="min-h-screen bg-[radial-gradient(circle_at_top_left,_rgba(249,115,22,0.22),_transparent_30%),radial-gradient(circle_at_top_right,_rgba(251,146,60,0.12),_transparent_24%),linear-gradient(180deg,_#080808_0%,_#000000_100%)] px-4 py-4 text-slate-100 sm:px-6 lg:px-8">
       <div className="mx-auto flex w-full max-w-[1280px] flex-col gap-5">
-        <div className="grid gap-5 lg:grid-cols-[1.55fr_0.95fr]">
+        <div className="grid gap-5">
           <section className="rounded-[34px] border border-orange-500/15 bg-[#050505]/95 p-5 shadow-[0_30px_70px_rgba(0,0,0,0.38)] backdrop-blur-xl sm:p-6">
             <header className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
               <div>
@@ -417,6 +417,9 @@ export function LegacyDashboard() {
               </Link>
               <Link href="/events" className="rounded-full border border-orange-500/20 bg-orange-500/10 px-4 py-2 text-sm font-semibold text-orange-100 transition hover:bg-orange-500/20">
                 Events
+              </Link>
+              <Link href="/chat" className="rounded-full border border-blue-500/20 bg-blue-500/10 px-4 py-2 text-sm font-semibold text-blue-100 transition hover:bg-blue-500/20">
+                Chat
               </Link>
             </nav>
 
@@ -477,94 +480,7 @@ export function LegacyDashboard() {
             </form>
           </section>
 
-          <section className="rounded-[34px] border border-orange-500/15 bg-[#050505]/95 p-5 shadow-[0_30px_70px_rgba(0,0,0,0.38)] backdrop-blur-xl sm:p-6">
-            <header>
-              <p className="text-[2rem] font-semibold tracking-tight text-white">AI conversation</p>
-              <p className="mt-3 text-sm text-slate-300">Talk to your AI like a real conversation and get a reply right away.</p>
-            </header>
 
-            <form className="mt-6" onSubmit={handleSendChat}>
-              <div className="max-h-[360px] space-y-3 overflow-y-auto rounded-[24px] border border-white/8 bg-[#08111d] p-4">
-                {chatMessages.map((message, index) => (
-                  <div
-                    key={`${message.role}-${index}`}
-                    className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
-                  >
-                    <div
-                      className={`max-w-[85%] rounded-[22px] px-4 py-3 text-sm leading-6 ${
-                        message.role === 'user'
-                          ? 'bg-orange-400 text-slate-950'
-                          : 'border border-white/8 bg-white/5 text-slate-100'
-                      }`}
-                    >
-                      {message.content}
-                    </div>
-                  </div>
-                ))}
-
-                {isChatting && (
-                  <div className="flex justify-start">
-                    <div className="rounded-[22px] border border-white/8 bg-white/5 px-4 py-3 text-sm text-slate-300">
-                      Thinking...
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              <label className="mt-4 block text-sm font-medium text-slate-200">
-                Your message
-                <textarea
-                  value={chatInput}
-                  onChange={(event) => setChatInput(event.target.value)}
-                  rows={4}
-                  placeholder="Ask me anything about your tasks, mood, or what to do next..."
-                  className="mt-2 w-full rounded-[22px] border border-white/10 bg-[#1b1b1b] px-4 py-3 text-slate-100 outline-none placeholder:text-slate-300 focus:border-orange-400/70"
-                />
-              </label>
-
-              <div className="mt-4 flex flex-wrap gap-3">
-                <button
-                  type="submit"
-                  disabled={isChatting || !chatInput.trim()}
-                  className="rounded-full bg-orange-500 px-7 py-3 text-sm font-semibold text-slate-950 transition hover:bg-orange-400 disabled:cursor-not-allowed disabled:opacity-60"
-                >
-                  {isChatting ? 'Thinking...' : 'Send message'}
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setChatMessages([
-                    {
-                      role: 'assistant',
-                      content: 'I\'m here with you. Tell me what you want to work through, and I\'ll talk it out with you.',
-                    },
-                  ])}
-                  className="rounded-full border border-white/10 bg-white/5 px-7 py-3 text-sm font-semibold text-slate-100 transition hover:bg-white/10"
-                >
-                  Reset chat
-                </button>
-              </div>
-            </form>
-
-            {chatError && (
-              <p className="mt-4 rounded-2xl border border-rose-400/20 bg-rose-500/10 px-4 py-3 text-sm text-rose-200">
-                {chatError}
-              </p>
-            )}
-
-            <div className="mt-5 flex flex-wrap gap-2">
-              {defaultSuggestions.slice(0, 4).map((starter) => (
-                <button
-                  key={starter.id}
-                  type="button"
-                  onClick={() => setChatInput(`Help me with ${starter.title.toLowerCase()}: ${starter.description}`)}
-                  className="rounded-full border border-orange-300/20 bg-orange-400/10 px-4 py-2 text-xs font-semibold text-orange-200 transition hover:bg-orange-400/20"
-                >
-                  {starter.title}
-                </button>
-              ))}
-            </div>
-          </section>
         </div>
 
         <section className="grid gap-5 lg:grid-cols-[1.05fr_0.95fr]">

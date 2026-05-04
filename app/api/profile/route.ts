@@ -64,24 +64,43 @@ export async function GET(request: NextRequest) {
         console.error('Failed to create default profile:', insertError);
       } else if (insertedProfile) {
         console.log('Created default profile');
-        const { data: leaderboard } = await supabase
+        const { data: leaderboardRaw } = await supabase
           .from('user_profiles')
           .select('user_id, total_xp, level, streak_days')
           .order('total_xp', { ascending: false })
           .limit(10);
         
+        const leaderboard = [];
+        if (leaderboardRaw) {
+          for (const entry of leaderboardRaw) {
+            const { data: user } = await supabase
+              .from('users')
+              .select('full_name, email')
+              .eq('id', entry.user_id)
+              .single();
+            
+            leaderboard.push({
+              id: entry.user_id,
+              name: user?.full_name || user?.email || 'Guest',
+              xp: entry.total_xp,
+              streak: entry.streak_days,
+              rank: computeRank(entry.total_xp || 0),
+            });
+          }
+        }
+        
         return NextResponse.json({
           profile: { ...insertedProfile, rank: 'Bronze' },
-          leaderboard: leaderboard || []
+          leaderboard
         });
       }
       
       return NextResponse.json({ error: 'User profile not found' }, { status: 404 });
     }
 
-    // Get leaderboard (top 10 users by XP)
+    // Get leaderboard (top 10 users by XP) with user names
     console.log('Fetching leaderboard');
-    const { data: leaderboard, error: leaderboardError } = await supabase
+    const { data: leaderboardRaw, error: leaderboardError } = await supabase
       .from('user_profiles')
       .select('user_id, total_xp, level, streak_days')
       .order('total_xp', { ascending: false })
@@ -89,6 +108,26 @@ export async function GET(request: NextRequest) {
 
     if (leaderboardError) {
       console.error('Leaderboard error:', leaderboardError);
+    }
+
+    // Fetch user names for leaderboard entries
+    const leaderboard = [];
+    if (leaderboardRaw) {
+      for (const entry of leaderboardRaw) {
+        const { data: user } = await supabase
+          .from('users')
+          .select('full_name, email')
+          .eq('id', entry.user_id)
+          .single();
+        
+        leaderboard.push({
+          id: entry.user_id,
+          name: user?.full_name || user?.email || 'Guest',
+          xp: entry.total_xp,
+          streak: entry.streak_days,
+          rank: computeRank(entry.total_xp || 0),
+        });
+      }
     }
 
     const profileWithRank = {

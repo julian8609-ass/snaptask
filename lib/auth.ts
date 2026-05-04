@@ -1,12 +1,10 @@
-import { PrismaAdapter } from '@next-auth/prisma-adapter';
 import bcrypt from 'bcryptjs';
 import CredentialsProvider from 'next-auth/providers/credentials';
 import GitHubProvider from 'next-auth/providers/github';
 import { NextAuthOptions } from 'next-auth';
-import { prisma } from './prisma';
+import { getSupabaseClient } from './supabase-safe';
 
 export const authOptions: NextAuthOptions = {
-  adapter: PrismaAdapter(prisma),
   session: {
     strategy: 'jwt',
   },
@@ -39,16 +37,19 @@ export const authOptions: NextAuthOptions = {
         }
 
         try {
-          const user = await prisma.user.findUnique({
-            where: { email: credentials.email.toLowerCase() },
-          });
+          const supabase = getSupabaseClient();
+          const { data: user } = await supabase
+            .from('users')
+            .select('*')
+            .eq('email', credentials.email.toLowerCase())
+            .single();
 
           if (!user) {
             console.log('[Auth] User not found:', credentials.email.toLowerCase());
             return null;
           }
 
-          const passwordMatches = await bcrypt.compare(credentials.password, user.password);
+          const passwordMatches = await bcrypt.compare(credentials.password, user.password_hash);
           if (!passwordMatches) {
             console.log('[Auth] Password mismatch for user:', credentials.email.toLowerCase());
             return null;
@@ -56,7 +57,7 @@ export const authOptions: NextAuthOptions = {
 
           return {
             id: user.id,
-            name: user.name,
+            name: user.full_name,
             email: user.email,
           };
         } catch (error) {

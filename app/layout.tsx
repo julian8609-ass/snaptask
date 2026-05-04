@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Script from "next/script";
 import { Manrope, Space_Grotesk } from "next/font/google";
 import "./globals.css";
 import { SessionProviderWrapper } from "@/components/SessionProviderWrapper";
@@ -30,6 +31,12 @@ export default function RootLayout({
       className={`${manrope.variable} ${spaceGrotesk.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col bg-[var(--bg-canvas)] text-[var(--text-primary)]">
+        <Script
+          src="https://www.tuqlas.com/chatbot.js"
+          data-key="tq_live_105b5994d09a3ed3f328e957e85a78b0f85c22e5"
+          data-api="https://www.tuqlas.com"
+          strategy="afterInteractive"
+        />
         <TaskProvider>
           <SessionProviderWrapper>{children}</SessionProviderWrapper>
         </TaskProvider>
