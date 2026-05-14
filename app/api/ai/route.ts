@@ -1,4 +1,6 @@
 import { NextResponse } from 'next/server';
+import { anyChatProviderConfigured, generateSnapTaskChatReply } from '@/lib/ai/chat-completion';
+import { buildSnapTaskChatSystemPrompt } from '@/lib/ai/chat-prompts';
 
 type ChatMessage = {
   role: 'system' | 'user' | 'assistant';
@@ -156,40 +158,6 @@ function getFallbackChatReply(mood: string, personality: string, lastMessage: st
   return `I hear you. For ${shortReply}, we can keep it simple and make one clear next move.${taskHint} If you want, I can break it down, schedule it, or make it easier.`;
 }
 
-async function callOpenAIChat(messages: ChatMessage[]) {
-  const key = process.env.OPENAI_API_KEY;
-  if (!key) {
-    console.error('OPENAI_API_KEY is not set.');
-    return null;
-  }
-
-  try {
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${key}`,
-      },
-      body: JSON.stringify({
-        model: 'gpt-3.5-turbo',
-        messages,
-        max_tokens: 250,
-      }),
-    });
-
-    if (!response.ok) {
-      console.error('OpenAI API error:', await response.text());
-      return null;
-    }
-
-    const json = await response.json();
-    return json?.choices?.[0]?.message?.content || null;
-  } catch (error) {
-    console.error('Error calling OpenAI API:', error);
-    return null;
-  }
-}
-
 async function callOpenAI(prompt: string) {
   const key = process.env.OPENAI_API_KEY;
   if (!key) {
@@ -242,7 +210,7 @@ export async function POST(request: Request) {
     if (type === 'chat') {
       const mood = String(body.mood || 'focused');
       const personality = String(body.personality || 'calm_mentor');
-      const messages = Array.isArray(body.messages) ? body.messages : [];
+      const rawMessages = Array.isArray(body.messages) ? body.messages : [];
       const context: ChatContext = {
         mood,
         personality,
@@ -252,32 +220,40 @@ export async function POST(request: Request) {
         completedTasks: Number(body.context?.completedTasks || 0),
         recentTasks: Array.isArray(body.context?.recentTasks) ? body.context.recentTasks : [],
       };
-      const lastUserMessage = [...messages].reverse().find((message) => message.role === 'user')?.content || '';
+      const lastUserMessage = [...rawMessages].reverse().find((message) => message.role === 'user')?.content || '';
 
-      const systemPrompt =
-        personality === 'strict_coach'
-          ? 'You are SnapTask AI, a direct but encouraging coach. Keep replies short, motivating, and conversational.'
-          : personality === 'funny_friend'
-          ? 'You are SnapTask AI, a playful friend. Keep replies warm, conversational, and lightly humorous.'
-          : 'You are SnapTask AI, a calm mentor. Keep replies warm, conversational, and supportive.';
+      const chatTurns = rawMessages
+        .filter((m: ChatMessage) => m.role === 'user' || m.role === 'assistant')
+        .map((m: ChatMessage) => ({ role: m.role as 'user' | 'assistant', content: String(m.content || '').trim() }))
+        .filter((m: { role: 'user' | 'assistant'; content: string }) => m.content.length > 0)
+        .slice(-12);
 
-      const responseText = await callOpenAIChat([
-        {
-          role: 'system',
-          content: `${systemPrompt} The user currently feels ${mood}. Their rank is ${context.rank}. They have ${context.activeTasks} active tasks and ${context.completedTasks} completed tasks. If helpful, reference their recent task: ${context.recentTasks?.[0] || 'none'}.` ,
-        },
-        ...messages.slice(-10),
-      ]);
-
-      if (!process.env.OPENAI_API_KEY) {
+      if (!anyChatProviderConfigured()) {
         return NextResponse.json({ response: getFallbackChatReply(mood, personality, lastUserMessage, context) });
       }
 
-      if (!responseText) {
+      const systemPrompt = buildSnapTaskChatSystemPrompt({
+        mood,
+        personality,
+        rank: context.rank,
+        activeTasks: context.activeTasks,
+        completedTasks: context.completedTasks,
+        recentTaskTitles: context.recentTasks?.map(String),
+      });
+
+      try {
+        const { text } = await generateSnapTaskChatReply({
+          messages: chatTurns,
+          systemPrompt,
+        });
+        if (!text?.trim()) {
+          return NextResponse.json({ response: getFallbackChatReply(mood, personality, lastUserMessage, context) });
+        }
+        return NextResponse.json({ response: text });
+      } catch (e) {
+        console.warn('/api/ai chat provider error:', e);
         return NextResponse.json({ response: getFallbackChatReply(mood, personality, lastUserMessage, context) });
       }
-
-      return NextResponse.json({ response: responseText });
     }
 
     const mood = String(body.mood || 'focused');
