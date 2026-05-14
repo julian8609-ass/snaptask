@@ -1,12 +1,9 @@
-import { GoogleGenerativeAI } from '@google/generative-ai';
-import { Task, AIMetadata, AISuggestion } from '@/types';
+import { GoogleGenerativeAI, type GenerativeModel } from '@google/generative-ai';
+import { Task, AISuggestion } from '@/types';
+import { generateSnapTaskChatReply, getGeminiKeyForServer, getGeminiModelId } from '@/lib/ai/chat-completion';
+import { buildSnapTaskChatSystemPrompt } from '@/lib/ai/chat-prompts';
 
-const apiKey = process.env.NEXT_PUBLIC_GEMINI_API_KEY || '';
-const client = new GoogleGenerativeAI(apiKey);
-
-const model = client.getGenerativeModel({ 
-  model: 'gemini-1.5-pro',
-  systemInstruction: `You are an AI assistant for a modern to-do list application. Your role is to:
+const JSON_TASK_SYSTEM = `You are an AI assistant for a modern to-do list application. Your role is to:
 1. Analyze task descriptions and suggest priorities
 2. Identify implicit deadlines or time references in natural language
 3. Suggest subtasks for complex tasks
@@ -14,8 +11,36 @@ const model = client.getGenerativeModel({
 5. Estimate task completion times
 6. Generate reminders based on urgency
 
-Respond with valid JSON only. Never include markdown formatting or extra text outside JSON.`
-});
+Respond with valid JSON only. Never include markdown formatting or extra text outside JSON.`;
+
+let cachedJsonModel: GenerativeModel | null | undefined;
+function getJsonTaskModel(): GenerativeModel | null {
+  if (cachedJsonModel !== undefined) return cachedJsonModel;
+  const key = getGeminiKeyForServer();
+  if (!key) {
+    cachedJsonModel = null;
+    return null;
+  }
+  const genAI = new GoogleGenerativeAI(key);
+  cachedJsonModel = genAI.getGenerativeModel({
+    model: getGeminiModelId(),
+    systemInstruction: JSON_TASK_SYSTEM,
+  });
+  return cachedJsonModel;
+}
+
+let cachedPlainModel: GenerativeModel | null | undefined;
+function getPlainModel(): GenerativeModel | null {
+  if (cachedPlainModel !== undefined) return cachedPlainModel;
+  const key = getGeminiKeyForServer();
+  if (!key) {
+    cachedPlainModel = null;
+    return null;
+  }
+  const genAI = new GoogleGenerativeAI(key);
+  cachedPlainModel = genAI.getGenerativeModel({ model: getGeminiModelId() });
+  return cachedPlainModel;
+}
 
 export interface TaskAnalysisResponse {
   priority: 'low' | 'medium' | 'high' | 'urgent';
@@ -35,6 +60,16 @@ export async function analyzeTask(
   taskTitle: string,
   taskDescription?: string
 ): Promise<TaskAnalysisResponse> {
+  const model = getJsonTaskModel();
+  if (!model) {
+    return {
+      priority: 'medium',
+      category: 'Other',
+      tags: [],
+      estimated_hours: 1,
+      confidence_score: 0.5,
+    };
+  }
   try {
     const prompt = `Analyze this task and provide structured suggestions in JSON format:
 
@@ -55,8 +90,7 @@ Return a JSON object with ONLY these fields (no markdown, no extra text):
 
     const result = await model.generateContent(prompt);
     const responseText = result.response.text();
-    
-    // Parse JSON response
+
     const jsonMatch = responseText.match(/\{[\s\S]*\}/);
     if (!jsonMatch) {
       throw new Error('No JSON found in response');
@@ -66,7 +100,6 @@ Return a JSON object with ONLY these fields (no markdown, no extra text):
     return analysis;
   } catch (error) {
     console.error('Error analyzing task:', error);
-    // Return default response on error
     return {
       priority: 'medium',
       category: 'Other',
@@ -81,6 +114,8 @@ Return a JSON object with ONLY these fields (no markdown, no extra text):
  * Generate task suggestions based on user input
  */
 export async function generateTaskSuggestions(userInput: string): Promise<string[]> {
+  const model = getJsonTaskModel();
+  if (!model) return [];
   try {
     const prompt = `Given this natural language input about a task: "${userInput}"
 
@@ -90,7 +125,7 @@ Return ONLY a JSON array of strings with task suggestions, no markdown:
 
     const result = await model.generateContent(prompt);
     const responseText = result.response.text();
-    
+
     const jsonMatch = responseText.match(/\[[\s\S]*\]/);
     if (!jsonMatch) {
       return [];
@@ -108,6 +143,8 @@ Return ONLY a JSON array of strings with task suggestions, no markdown:
  * Calculate reminder urgency based on task
  */
 export async function calculateReminderUrgency(task: Task): Promise<number> {
+  const model = getJsonTaskModel();
+  if (!model) return 50;
   try {
     const prompt = `Based on this task, calculate urgency level (0-100):
 Title: "${task.title}"
@@ -121,7 +158,7 @@ Return ONLY a JSON object with a single "urgency" number (0-100):
 
     const result = await model.generateContent(prompt);
     const responseText = result.response.text();
-    
+
     const jsonMatch = responseText.match(/\{[\s\S]*\}/);
     if (!jsonMatch) {
       return 50;
@@ -139,6 +176,8 @@ Return ONLY a JSON object with a single "urgency" number (0-100):
  * Generate personalized reminders
  */
 export async function generateReminderText(task: Task): Promise<string> {
+  const model = getJsonTaskModel();
+  if (!model) return `Reminder: ${task.title}`;
   try {
     const prompt = `Generate a concise, personalized reminder message for this task (max 100 chars):
 Title: "${task.title}"
@@ -150,7 +189,7 @@ Return ONLY a JSON object:
 
     const result = await model.generateContent(prompt);
     const responseText = result.response.text();
-    
+
     const jsonMatch = responseText.match(/\{[\s\S]*\}/);
     if (!jsonMatch) {
       return `Reminder: ${task.title}`;
@@ -198,32 +237,14 @@ export async function chatWithAssistant(
   conversationHistory: ChatMessage[] = []
 ): Promise<ChatResponse> {
   try {
-    // Build context from recent messages (last 10 messages)
     const recentMessages = conversationHistory.slice(-10);
-    const conversationContext = recentMessages
-      .map((msg) => `${msg.role === 'user' ? 'User' : 'Assistant'}: ${msg.content}`)
-      .join('\n');
+    const turns = [...recentMessages.map((m) => ({ role: m.role as 'user' | 'assistant', content: m.content })), { role: 'user' as const, content: userMessage }];
 
-    const systemPrompt = `You are a friendly and helpful AI assistant for a task management app. 
-You help users with:
-1. Answering questions naturally and clearly
-2. Converting casual requests into structured tasks
-3. Providing suggestions and breaking down complex goals
-4. Maintaining conversational context
+    const { text: assistantMessage } = await generateSnapTaskChatReply({
+      messages: turns,
+      systemPrompt: buildSnapTaskChatSystemPrompt(),
+    });
 
-Keep responses concise (1-3 sentences typically) and helpful.
-Avoid repetition and always be constructive.`;
-
-    const prompt = `${conversationContext ? 'Conversation context:\n' + conversationContext + '\n\n' : ''}User: ${userMessage}
-
-Respond naturally and conversationally. Keep it brief and helpful.`;
-
-    // Use a chat model instance for multi-turn conversations
-    const chatModel = client.getGenerativeModel({ model: 'gemini-1.5-pro' });
-    const result = await chatModel.generateContent(prompt);
-    const assistantMessage = result.response.text();
-
-    // Check if the user message contains a task request
     const extractedTask = await detectAndExtractTask(userMessage);
 
     return {
@@ -244,8 +265,9 @@ Respond naturally and conversationally. Keep it brief and helpful.`;
  * Detect if user message contains a task request and extract task details
  */
 export async function detectAndExtractTask(userMessage: string): Promise<ExtractedTask | null> {
+  const model = getPlainModel();
+  if (!model) return null;
   try {
-    // Quick keywords check for performance
     const taskKeywords = [
       'remind',
       'task',
@@ -265,7 +287,6 @@ export async function detectAndExtractTask(userMessage: string): Promise<Extract
     const messageLC = userMessage.toLowerCase();
     const hasTaskKeyword = taskKeywords.some((keyword) => messageLC.includes(keyword));
 
-    // If no task keywords, skip heavy processing
     if (!hasTaskKeyword) {
       return null;
     }
@@ -294,7 +315,7 @@ If NOT a task request, return:
 
 ONLY return valid JSON, no markdown or extra text.`;
 
-    const result = await client.getGenerativeModel({ model: 'gemini-1.5-pro' }).generateContent(prompt);
+    const result = await model.generateContent(prompt);
     const responseText = result.response.text();
 
     const jsonMatch = responseText.match(/\{[\s\S]*\}/);
@@ -304,7 +325,6 @@ ONLY return valid JSON, no markdown or extra text.`;
 
     const analysis = JSON.parse(jsonMatch[0]);
 
-    // Only return task if confidence is reasonably high
     if (analysis.isTask && analysis.confidence > 0.6) {
       return {
         title: analysis.title || 'Untitled Task',
@@ -328,6 +348,8 @@ ONLY return valid JSON, no markdown or extra text.`;
  * Generate task suggestions based on user's stated goals
  */
 export async function suggestTasksFromGoal(goal: string): Promise<ExtractedTask[]> {
+  const model = getPlainModel();
+  if (!model) return [];
   try {
     const prompt = `The user wants to: "${goal}"
 
@@ -344,7 +366,7 @@ Return ONLY a JSON array of tasks:
   }
 ]`;
 
-    const result = await client.getGenerativeModel({ model: 'gemini-1.5-pro' }).generateContent(prompt);
+    const result = await model.generateContent(prompt);
     const responseText = result.response.text();
 
     const jsonMatch = responseText.match(/\[[\s\S]*\]/);
@@ -364,6 +386,8 @@ Return ONLY a JSON array of tasks:
  * Generate daily AI summary of tasks and recommendations
  */
 export async function generateDailySummary(tasks: Task[]): Promise<string> {
+  const model = getPlainModel();
+  if (!model) return 'Have a productive day! Focus on your most important tasks.';
   try {
     const tasksSummary = tasks
       .slice(0, 5)
@@ -375,7 +399,7 @@ ${tasksSummary}
 
 Generate a brief, motivational daily summary with prioritization advice (max 150 chars):`;
 
-    const result = await client.getGenerativeModel({ model: 'gemini-1.5-pro' }).generateContent(prompt);
+    const result = await model.generateContent(prompt);
     return result.response.text();
   } catch (error) {
     console.error('Error generating summary:', error);

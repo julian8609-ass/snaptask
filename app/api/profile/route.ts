@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getSupabaseClient } from '@/lib/supabase-safe';
+import { getSupabaseClient, isSupabaseServiceConfigured } from '@/lib/supabase-safe';
 
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth';
@@ -27,6 +27,26 @@ export async function GET(request: NextRequest) {
     if (!userId) {
       console.error('userId is missing from request');
       return NextResponse.json({ error: 'userId required' }, { status: 400 });
+    }
+
+    if (!isSupabaseServiceConfigured()) {
+      return NextResponse.json({
+        profile: {
+          name: 'Guest',
+          email: 'demo@local',
+          xp: 0,
+          rank: 'Bronze',
+          streak: 0,
+          mood: 'focused',
+          personality: 'calm_mentor',
+          energy: 5,
+          completedTasks: 0,
+          pendingTasks: 0,
+          aiTasks: 0,
+          userTasks: 0,
+        },
+        leaderboard: [],
+      });
     }
 
     const supabase = getSupabase();

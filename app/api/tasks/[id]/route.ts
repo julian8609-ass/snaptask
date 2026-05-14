@@ -1,13 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseServer } from '@/lib/db/supabase';
 
-const supabase = getSupabaseServer();
-
 type Params = {
   params: { id: string } | Promise<{ id: string }>;
 };
 
 export async function GET(request: NextRequest, { params }: Params) {
+  const supabase = getSupabaseServer();
   try {
     const resolvedParams = await params;
     const url = new URL(request.url);
@@ -37,6 +36,7 @@ export async function GET(request: NextRequest, { params }: Params) {
 }
 
 export async function PATCH(request: NextRequest, { params }: Params) {
+  const supabase = getSupabaseServer();
   try {
     const resolvedParams = await params;
     const url = new URL(request.url);
@@ -87,6 +87,7 @@ export async function PATCH(request: NextRequest, { params }: Params) {
 }
 
 export async function DELETE(request: NextRequest, { params }: Params) {
+  const supabase = getSupabaseServer();
   try {
     const resolvedParams = await params;
     const url = new URL(request.url);

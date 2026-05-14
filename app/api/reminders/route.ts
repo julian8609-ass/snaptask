@@ -1,9 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseServer } from '@/lib/db/supabase';
 
-const supabase = getSupabaseServer();
-
 export async function GET(request: NextRequest) {
+  const supabase = getSupabaseServer();
   try {
     const url = new URL(request.url);
     const userId = url.searchParams.get('userId');
@@ -40,6 +39,7 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
+  const supabase = getSupabaseServer();
   try {
     const body = await request.json();
     const { userId, taskId, title, reminderTime, reminderType } = body;
