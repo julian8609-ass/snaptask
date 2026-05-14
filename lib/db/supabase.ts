@@ -3,15 +3,20 @@ import { getSupabaseClient, isSupabaseServiceConfigured } from '../../lib/supaba
 
 // Lazy server-side Supabase client factory (prevents build-time errors)
 let cachedSupabaseServer: any = null;
+let cachedSupabaseServerIsFallback = false;
 
 export function getSupabaseServer() {
-  if (cachedSupabaseServer) return cachedSupabaseServer;
+  const configured = isSupabaseServiceConfigured();
+  if (cachedSupabaseServer && !(cachedSupabaseServerIsFallback && configured)) {
+    return cachedSupabaseServer;
+  }
 
-  if (!isSupabaseServiceConfigured()) {
+  if (!configured) {
     console.warn(
       'Supabase server client not configured (invalid or missing NEXT_PUBLIC_SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY)',
     );
     cachedSupabaseServer = getSupabaseClient();
+    cachedSupabaseServerIsFallback = true;
     return cachedSupabaseServer;
   }
 
@@ -20,9 +25,11 @@ export function getSupabaseServer() {
 
   try {
     cachedSupabaseServer = createClient(supabaseUrl, supabaseServiceKey);
+    cachedSupabaseServerIsFallback = false;
   } catch (error) {
     console.error('Failed to create Supabase server client:', error);
     cachedSupabaseServer = getSupabaseClient();
+    cachedSupabaseServerIsFallback = true;
   }
   return cachedSupabaseServer;
 }

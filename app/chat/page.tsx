@@ -425,24 +425,27 @@ export default function ChatPage() {
       <Paper
         elevation={0}
         sx={{
-          padding: 2,
+          px: { xs: 1.5, sm: 2 },
+          py: { xs: 1.25, sm: 1.5 },
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
+          gap: 1.5,
+          flexWrap: 'wrap',
           backgroundColor: 'rgba(5, 5, 5, 0.96)',
           color: 'white',
           borderBottom: '1px solid rgba(249, 115, 22, 0.14)',
           backdropFilter: 'blur(18px)',
         }}
       >
-        <Stack direction="row" alignItems="center" spacing={1.5}>
+        <Stack direction="row" alignItems="center" spacing={1.25} sx={{ minWidth: 0 }}>
           <Box
             sx={{
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              width: 40,
-              height: 40,
+              width: { xs: 36, sm: 40 },
+              height: { xs: 36, sm: 40 },
               borderRadius: '999px',
               background: 'linear-gradient(135deg, #f97316 0%, #fb923c 100%)',
               boxShadow: '0 12px 30px rgba(249, 115, 22, 0.28)',
@@ -454,12 +457,12 @@ export default function ChatPage() {
             <Typography variant="h5" sx={{ fontWeight: 800, lineHeight: 1.1 }}>
               AI Assistant
             </Typography>
-            <Typography variant="caption" sx={{ color: '#cbd5e1' }}>
-              Dark task studio theme
+            <Typography variant="caption" sx={{ color: '#cbd5e1', display: { xs: 'none', sm: 'block' } }}>
+              Task-aware chat workspace
             </Typography>
           </Box>
         </Stack>
-        <Stack direction="row" spacing={1} alignItems="center">
+        <Stack direction="row" spacing={0.75} alignItems="center" sx={{ ml: 'auto' }}>
           {isFallbackMode ? (
             <Tooltip title={fallbackWarning ?? 'Using fallback responses'}>
               <Chip label="Fallback mode" color="warning" sx={{ color: '#ffedd5', background: 'rgba(249,115,22,0.12)' }} />
@@ -519,10 +522,11 @@ export default function ChatPage() {
         sx={{
           flex: 1,
           overflowY: 'auto',
-          padding: 2,
+          px: { xs: 1.25, sm: 2 },
+          py: { xs: 1.25, sm: 2 },
           display: 'flex',
           flexDirection: 'column',
-          gap: 2,
+          gap: { xs: 1.25, sm: 1.75 },
           background:
             'linear-gradient(180deg, rgba(8, 8, 8, 0.92) 0%, rgba(10, 10, 10, 0.98) 100%)',
         }}
@@ -555,19 +559,21 @@ export default function ChatPage() {
                 display: 'flex',
                 justifyContent: message.role === 'user' ? 'flex-end' : 'flex-start',
                 gap: 1,
+                alignItems: 'flex-start',
               }}
             >
               {message.role === 'assistant' && <SmartToyIcon sx={{ mt: 1, color: '#fb923c' }} />}
               <Card
                 sx={{
-                  maxWidth: '70%',
-                  backgroundColor: message.role === 'user' ? 'rgba(249, 115, 22, 0.95)' : 'rgba(255, 255, 255, 0.06)',
+                  maxWidth: { xs: '88%', sm: '76%', lg: '68%' },
+                  backgroundColor: message.role === 'user' ? 'rgba(249, 115, 22, 0.95)' : 'rgba(255, 255, 255, 0.065)',
                   color: '#f8fafc',
                   border: message.role === 'user' ? 'none' : '1px solid rgba(255, 255, 255, 0.08)',
-                  boxShadow: 'none',
+                  boxShadow: '0 16px 38px rgba(0,0,0,0.18)',
+                  borderRadius: message.role === 'user' ? '18px 18px 4px 18px' : '18px 18px 18px 4px',
                 }}
               >
-                <CardContent sx={{ padding: '12px 16px', '&:last-child': { pb: '12px' } }}>
+                <CardContent sx={{ px: { xs: 1.5, sm: 2 }, py: 1.25, '&:last-child': { pb: 1.25 } }}>
                   <MessageBody role={message.role} content={message.content} />
                 </CardContent>
               </Card>
@@ -665,12 +671,13 @@ export default function ChatPage() {
       <Paper
         elevation={0}
         sx={{
-          padding: 2,
+          px: { xs: 1.25, sm: 2 },
+          py: { xs: 1.25, sm: 1.5 },
           backgroundColor: 'rgba(5, 5, 5, 0.96)',
           borderTop: '1px solid rgba(249, 115, 22, 0.14)',
         }}
       >
-        <Stack direction="row" spacing={1}>
+        <Stack direction="row" spacing={1} alignItems="flex-end">
           <TextField
             fullWidth
             multiline
@@ -710,7 +717,7 @@ export default function ChatPage() {
             variant="contained"
             onClick={sendMessage}
             disabled={isLoading || !inputValue.trim()}
-            sx={{ paddingX: 3 }}
+            sx={{ minWidth: { xs: 48, sm: 64 }, height: 44, px: { xs: 1.5, sm: 3 } }}
             disableElevation
             style={{
               background: 'linear-gradient(135deg, #f97316 0%, #fb923c 100%)',
@@ -722,7 +729,7 @@ export default function ChatPage() {
             <SendIcon />
           </Button>
         </Stack>
-        <Typography variant="caption" sx={{ mt: 1, display: 'block', color: '#94a3b8' }}>
+        <Typography variant="caption" sx={{ mt: 0.75, display: 'block', color: '#94a3b8' }}>
           Messages are saved locally in your browser
         </Typography>
       </Paper>

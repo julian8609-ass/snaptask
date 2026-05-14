@@ -138,7 +138,7 @@ export const db = {
     getByUser: async (userId: string): Promise<Reminder[]> => {
       const dbState = readDb();
       return dbState.reminders.filter(
-        (reminder) => reminder.user_id === userId && reminder.status === 'pending'
+        (reminder) => reminder.user_id === userId && !reminder.is_sent
       );
     },
 
@@ -146,7 +146,7 @@ export const db = {
       const dbState = readDb();
       const index = dbState.reminders.findIndex((reminder) => reminder.id === reminderId);
       if (index === -1) return false;
-      dbState.reminders[index] = { ...dbState.reminders[index], status: 'sent' };
+      dbState.reminders[index] = { ...dbState.reminders[index], is_sent: true };
       writeDb(dbState);
       return true;
     },

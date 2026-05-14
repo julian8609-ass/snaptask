@@ -1,12 +1,32 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseServer } from '@/lib/db/supabase';
+import { isSupabaseUnavailableError, markSupabaseUnavailable, shouldUseSupabaseFallbackSoon } from '@/lib/supabase-safe';
+import db from '@/lib/db';
+import type { Task } from '@/types';
 
 type Params = {
   params: { id: string } | Promise<{ id: string }>;
 };
 
+async function getLocalTask(taskId: string, userId: string) {
+  const task = await db.tasks.getById(taskId);
+  if (!task || task.user_id !== userId) return null;
+  return task;
+}
+
+function localUpdatesFromBody(body: Partial<Task>) {
+  const updates: Partial<Task> = {};
+  if (body.title !== undefined) updates.title = body.title;
+  if (body.description !== undefined) updates.description = body.description;
+  if (body.status !== undefined) updates.status = body.status;
+  if (body.priority !== undefined) updates.priority = body.priority;
+  if (body.due_date !== undefined) updates.due_date = body.due_date;
+  if (body.scheduledDate !== undefined) updates.scheduledDate = body.scheduledDate;
+  if (body.scheduledTime !== undefined) updates.scheduledTime = body.scheduledTime;
+  return updates;
+}
+
 export async function GET(request: NextRequest, { params }: Params) {
-  const supabase = getSupabaseServer();
   try {
     const resolvedParams = await params;
     const url = new URL(request.url);
@@ -16,6 +36,13 @@ export async function GET(request: NextRequest, { params }: Params) {
       return NextResponse.json({ error: 'userId required' }, { status: 400 });
     }
 
+    if (await shouldUseSupabaseFallbackSoon()) {
+      const task = await getLocalTask(resolvedParams.id, userId);
+      if (!task) return NextResponse.json({ error: 'Task not found' }, { status: 404 });
+      return NextResponse.json(task);
+    }
+
+    const supabase = getSupabaseServer();
     const { data: task, error } = await supabase
       .from('tasks')
       .select('*')
@@ -25,6 +52,11 @@ export async function GET(request: NextRequest, { params }: Params) {
 
     if (error || !task) {
       console.error('Task error:', error);
+      if (isSupabaseUnavailableError(error)) {
+        markSupabaseUnavailable();
+        const localTask = await getLocalTask(resolvedParams.id, userId);
+        if (localTask) return NextResponse.json(localTask);
+      }
       return NextResponse.json({ error: 'Task not found' }, { status: 404 });
     }
 
@@ -36,7 +68,6 @@ export async function GET(request: NextRequest, { params }: Params) {
 }
 
 export async function PATCH(request: NextRequest, { params }: Params) {
-  const supabase = getSupabaseServer();
   try {
     const resolvedParams = await params;
     const url = new URL(request.url);
@@ -47,6 +78,15 @@ export async function PATCH(request: NextRequest, { params }: Params) {
       return NextResponse.json({ error: 'userId required' }, { status: 400 });
     }
 
+    if (await shouldUseSupabaseFallbackSoon()) {
+      const task = await getLocalTask(resolvedParams.id, userId);
+      if (!task) return NextResponse.json({ error: 'Task not found' }, { status: 404 });
+
+      const updated = await db.tasks.update(resolvedParams.id, localUpdatesFromBody(body));
+      return NextResponse.json(updated);
+    }
+
+    const supabase = getSupabaseServer();
     // Verify task belongs to user
     const { data: task, error: taskError } = await supabase
       .from('tasks')
@@ -57,6 +97,14 @@ export async function PATCH(request: NextRequest, { params }: Params) {
 
     if (taskError || !task) {
       console.error('Task error:', taskError);
+      if (isSupabaseUnavailableError(taskError)) {
+        markSupabaseUnavailable();
+        const localTask = await getLocalTask(resolvedParams.id, userId);
+        if (!localTask) return NextResponse.json({ error: 'Task not found' }, { status: 404 });
+
+        const updated = await db.tasks.update(resolvedParams.id, localUpdatesFromBody(body));
+        return NextResponse.json(updated);
+      }
       return NextResponse.json({ error: 'Task not found' }, { status: 404 });
     }
 
@@ -76,6 +124,11 @@ export async function PATCH(request: NextRequest, { params }: Params) {
 
     if (updateError) {
       console.error('Update error:', updateError);
+      if (isSupabaseUnavailableError(updateError)) {
+        markSupabaseUnavailable();
+        const updated = await db.tasks.update(resolvedParams.id, localUpdatesFromBody(body));
+        return NextResponse.json(updated);
+      }
       return NextResponse.json({ error: updateError.message }, { status: 500 });
     }
 
@@ -87,7 +140,6 @@ export async function PATCH(request: NextRequest, { params }: Params) {
 }
 
 export async function DELETE(request: NextRequest, { params }: Params) {
-  const supabase = getSupabaseServer();
   try {
     const resolvedParams = await params;
     const url = new URL(request.url);
@@ -97,6 +149,15 @@ export async function DELETE(request: NextRequest, { params }: Params) {
       return NextResponse.json({ error: 'userId required' }, { status: 400 });
     }
 
+    if (await shouldUseSupabaseFallbackSoon()) {
+      const task = await getLocalTask(resolvedParams.id, userId);
+      if (!task) return NextResponse.json({ error: 'Task not found' }, { status: 404 });
+
+      const success = await db.tasks.delete(resolvedParams.id);
+      return NextResponse.json({ success });
+    }
+
+    const supabase = getSupabaseServer();
     // Verify task belongs to user
     const { data: task, error: taskError } = await supabase
       .from('tasks')
@@ -107,6 +168,14 @@ export async function DELETE(request: NextRequest, { params }: Params) {
 
     if (taskError || !task) {
       console.error('Task error:', taskError);
+      if (isSupabaseUnavailableError(taskError)) {
+        markSupabaseUnavailable();
+        const localTask = await getLocalTask(resolvedParams.id, userId);
+        if (!localTask) return NextResponse.json({ error: 'Task not found' }, { status: 404 });
+
+        const success = await db.tasks.delete(resolvedParams.id);
+        return NextResponse.json({ success });
+      }
       return NextResponse.json({ error: 'Task not found' }, { status: 404 });
     }
 
@@ -118,6 +187,11 @@ export async function DELETE(request: NextRequest, { params }: Params) {
 
     if (deleteError) {
       console.error('Delete error:', deleteError);
+      if (isSupabaseUnavailableError(deleteError)) {
+        markSupabaseUnavailable();
+        const success = await db.tasks.delete(resolvedParams.id);
+        return NextResponse.json({ success });
+      }
       return NextResponse.json({ error: deleteError.message }, { status: 500 });
     }
 

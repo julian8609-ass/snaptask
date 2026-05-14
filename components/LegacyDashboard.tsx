@@ -329,7 +329,8 @@ export function LegacyDashboard() {
   };
 
   const handleComplete = async (taskId: string) => {
-    await fetch(`/api/tasks/${taskId}`, {
+    const userId = getDemoUserId();
+    await fetch(`/api/tasks/${taskId}?userId=${encodeURIComponent(userId)}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       credentials: 'include',
@@ -340,7 +341,8 @@ export function LegacyDashboard() {
   };
 
   const handleSkip = async (taskId: string, currentSkipCount: number) => {
-    await fetch(`/api/tasks/${taskId}`, {
+    const userId = getDemoUserId();
+    await fetch(`/api/tasks/${taskId}?userId=${encodeURIComponent(userId)}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       credentials: 'include',
@@ -351,7 +353,8 @@ export function LegacyDashboard() {
   };
 
   const handleDelete = async (taskId: string) => {
-    await fetch(`/api/tasks/${taskId}`, {
+    const userId = getDemoUserId();
+    await fetch(`/api/tasks/${taskId}?userId=${encodeURIComponent(userId)}`, {
       method: 'DELETE',
       credentials: 'include',
     });
@@ -360,42 +363,43 @@ export function LegacyDashboard() {
   };
 
   return (
-    <main className="min-h-screen bg-[radial-gradient(circle_at_top_left,_rgba(249,115,22,0.22),_transparent_30%),radial-gradient(circle_at_top_right,_rgba(251,146,60,0.12),_transparent_24%),linear-gradient(180deg,_#080808_0%,_#000000_100%)] px-4 py-4 text-slate-100 sm:px-6 lg:px-8">
-      <div className="mx-auto flex w-full max-w-[1280px] flex-col gap-5">
-        <div className="grid gap-5">
-          <section className="rounded-[34px] border border-orange-500/15 bg-[#050505]/95 p-5 shadow-[0_30px_70px_rgba(0,0,0,0.38)] backdrop-blur-xl sm:p-6">
-            <header className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-              <div>
-                <p className="text-3xl font-semibold tracking-tight text-white sm:text-[2.15rem]">Dashboard</p>
-                <p className="mt-2 text-sm text-slate-300">AI-created and user tasks live together here.</p>
+    <main className="min-h-screen px-3 py-3 text-slate-100 sm:px-5 lg:px-7">
+      <div className="mx-auto flex w-full max-w-[1180px] flex-col gap-3 sm:gap-4">
+        <div className="grid gap-3">
+          <section className="surface-card p-4 sm:p-5">
+            <header className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+              <div className="max-w-2xl">
+                <p className="text-xs font-bold uppercase tracking-[0.32em] text-orange-300">SnapTask command center</p>
+                <h1 className="mt-2 text-2xl font-semibold tracking-tight text-white sm:text-4xl">Plan, prioritize, execute.</h1>
+                <p className="mt-1 text-sm text-slate-300">A compact task cockpit for AI ideas, manual tasks, streaks, and daily focus.</p>
               </div>
 
-              <div className="flex items-center gap-2 self-start rounded-full border border-white/5 bg-white/5 p-1 text-sm text-slate-100 shadow-inner shadow-black/20">
-                <span className="rounded-full bg-[#171717] px-4 py-2 font-medium text-slate-200">{activeCount} active</span>
-                <span className="rounded-full bg-[#171717] px-4 py-2 font-medium text-slate-200">{completedCount} completed</span>
+              <div className="grid grid-cols-2 gap-2 rounded-[22px] border border-white/10 bg-white/[0.04] p-2 text-sm text-slate-100 shadow-inner shadow-black/20 sm:flex">
+                <span className="rounded-2xl bg-orange-500/15 px-3 py-2 font-semibold text-orange-100">{activeCount} active</span>
+                <span className="rounded-2xl bg-emerald-500/10 px-3 py-2 font-semibold text-emerald-100">{completedCount} done</span>
               </div>
             </header>
 
-            <div className="mt-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-              <div className="rounded-[26px] border border-white/8 bg-white/5 p-4">
-                <p className="text-xs uppercase tracking-[0.35em] text-slate-400">Rank</p>
-                <p className="mt-3 text-2xl font-semibold text-white">{loadingProfile ? '...' : rank}</p>
-                <p className="mt-1 text-sm text-slate-300">{xp} XP earned</p>
+            <div className="mt-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+              <div className="metric-tile">
+                <p className="metric-label">Rank</p>
+                <p className="metric-value">{loadingProfile ? '...' : rank}</p>
+                <p className="mt-1 text-xs text-slate-400">{xp} XP earned</p>
               </div>
-              <div className="rounded-[26px] border border-white/8 bg-white/5 p-4">
-                <p className="text-xs uppercase tracking-[0.35em] text-slate-400">Streak</p>
-                <p className="mt-3 text-2xl font-semibold text-white">{loadingProfile ? '...' : (profile?.streak ?? 0)}</p>
-                <p className="mt-1 text-sm text-slate-300">Daily momentum count</p>
+              <div className="metric-tile">
+                <p className="metric-label">Streak</p>
+                <p className="metric-value">{loadingProfile ? '...' : (profile?.streak ?? 0)}</p>
+                <p className="mt-1 text-xs text-slate-400">Daily momentum</p>
               </div>
-              <div className="rounded-[26px] border border-white/8 bg-white/5 p-4">
-                <p className="text-xs uppercase tracking-[0.35em] text-slate-400">Mood</p>
-                <p className="mt-3 text-2xl font-semibold text-white">{loadingProfile ? '...' : (profile?.mood ?? 'focused')}</p>
-                <p className="mt-1 text-sm text-slate-300">Current profile mood</p>
+              <div className="metric-tile">
+                <p className="metric-label">Mood</p>
+                <p className="metric-value">{loadingProfile ? '...' : (profile?.mood ?? 'focused')}</p>
+                <p className="mt-1 text-xs text-slate-400">Profile tone</p>
               </div>
-              <div className="rounded-[26px] border border-white/8 bg-white/5 p-4">
-                <p className="text-xs uppercase tracking-[0.35em] text-slate-400">Energy</p>
-                <p className="mt-3 text-2xl font-semibold text-white">{loadingProfile ? '...' : (profile?.energy ?? 0)}</p>
-                <p className="mt-1 text-sm text-slate-300">Available today</p>
+              <div className="metric-tile">
+                <p className="metric-label">Energy</p>
+                <p className="metric-value">{loadingProfile ? '...' : (profile?.energy ?? 0)}</p>
+                <p className="mt-1 text-xs text-slate-400">Available today</p>
               </div>
             </div>
 
@@ -405,42 +409,42 @@ export function LegacyDashboard() {
               </p>
             )}
 
-            <nav className="mt-5 flex flex-wrap gap-2">
-              <Link href="/profile" className="rounded-full border border-orange-500/20 bg-orange-500/10 px-4 py-2 text-sm font-semibold text-orange-100 transition hover:bg-orange-500/20">
+            <nav className="mt-4 flex flex-wrap gap-2">
+              <Link href="/profile" className="pill-link">
                 Profile
               </Link>
-              <Link href="/tasks" className="rounded-full border border-orange-500/20 bg-orange-500/10 px-4 py-2 text-sm font-semibold text-orange-100 transition hover:bg-orange-500/20">
+              <Link href="/tasks" className="pill-link">
                 Tasks
               </Link>
-              <Link href="/daily-reflection" className="rounded-full border border-orange-500/20 bg-orange-500/10 px-4 py-2 text-sm font-semibold text-orange-100 transition hover:bg-orange-500/20">
+              <Link href="/daily-reflection" className="pill-link">
                 Daily Reflection
               </Link>
-              <Link href="/events" className="rounded-full border border-orange-500/20 bg-orange-500/10 px-4 py-2 text-sm font-semibold text-orange-100 transition hover:bg-orange-500/20">
+              <Link href="/events" className="pill-link">
                 Events
               </Link>
-              <Link href="/chat" className="rounded-full border border-blue-500/20 bg-blue-500/10 px-4 py-2 text-sm font-semibold text-blue-100 transition hover:bg-blue-500/20">
+              <Link href="/chat" className="pill-link border-sky-400/25 bg-sky-400/10 text-sky-100">
                 Chat
               </Link>
             </nav>
 
-            <form className="mt-6" onSubmit={handleSubmit}>
-              <div className="grid gap-4 md:grid-cols-2">
-                <label className="grid gap-2 text-sm font-medium text-slate-200">
+            <form className="mt-4 rounded-[22px] border border-white/10 bg-white/[0.035] p-3 sm:p-4" onSubmit={handleSubmit}>
+              <div className="grid gap-3 xl:grid-cols-[minmax(0,1fr)_220px_150px]">
+                <label className="app-label min-w-0">
                   Task title
                   <input
                     value={title}
                     onChange={(event) => setTitle(event.target.value)}
-                    placeholder="Write a fun task title"
-                    className="h-12 rounded-2xl border border-white/8 bg-[#040816] px-4 text-slate-100 outline-none transition placeholder:text-slate-500 focus:border-orange-400/70"
+                    placeholder="What needs to move today?"
+                    className="app-input placeholder:text-slate-500"
                   />
                 </label>
 
-                <label className="grid gap-2 text-sm font-medium text-slate-200">
+                <label className="app-label">
                   Difficulty
                   <select
                     value={difficulty}
                     onChange={(event) => setDifficulty(event.target.value as Difficulty)}
-                    className="h-12 rounded-2xl border border-white/8 bg-[#040816] px-4 text-slate-100 outline-none transition focus:border-orange-400/70"
+                    className="app-select"
                   >
                     {difficultyOptions.map((option) => (
                       <option key={option.value} value={option.value}>
@@ -449,26 +453,23 @@ export function LegacyDashboard() {
                     ))}
                   </select>
                 </label>
-              </div>
-
-              <div className="mt-4 grid gap-4 md:grid-cols-2">
                 <button
                   type="submit"
                   disabled={isSaving || !title.trim()}
-                  className="md:col-span-2 h-11 rounded-full bg-orange-500 px-7 text-sm font-semibold text-slate-950 transition hover:bg-orange-400 disabled:cursor-not-allowed disabled:opacity-60"
+                  className="app-primary-button w-full self-end px-5"
                 >
                   {isSaving ? 'Adding...' : 'Add task'}
                 </button>
               </div>
 
-              <label className="mt-4 grid gap-2 text-sm font-medium text-slate-200">
+              <label className="app-label mt-3">
                 Description
                 <textarea
                   value={description}
                   onChange={(event) => setDescription(event.target.value)}
-                  placeholder="Optional note for your task"
-                  rows={5}
-                  className="min-h-[128px] rounded-[24px] border border-white/8 bg-[#040816] px-4 py-3 text-slate-100 outline-none transition placeholder:text-slate-500 focus:border-orange-400/70"
+                  placeholder="Optional note, context, or next step"
+                  rows={3}
+                  className="app-textarea placeholder:text-slate-500"
                 />
               </label>
 
@@ -483,17 +484,22 @@ export function LegacyDashboard() {
 
         </div>
 
-        <section className="grid gap-5 lg:grid-cols-[1.05fr_0.95fr]">
-          <article className="rounded-[34px] border border-orange-500/15 bg-[#0f0f0f]/90 p-5 shadow-[0_24px_55px_rgba(0,0,0,0.25)] backdrop-blur-xl sm:p-6">
-            <h2 className="text-xl font-semibold text-white">Leaderboard</h2>
+        <section className="grid gap-3 lg:grid-cols-[0.9fr_1.1fr]">
+          <article className="surface-card p-4 sm:p-5">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <p className="text-xs font-bold uppercase tracking-[0.24em] text-orange-300">Momentum</p>
+                <h2 className="mt-1 text-lg font-semibold text-white">Leaderboard</h2>
+              </div>
+            </div>
             {loadingProfile ? (
               <p className="mt-4 text-sm text-slate-300">Loading leaderboard...</p>
             ) : leaderboard.length === 0 ? (
               <p className="mt-4 text-sm text-slate-300">No leaderboard data yet.</p>
             ) : (
-              <div className="mt-4 space-y-3">
+              <div className="mt-3 space-y-2">
                 {leaderboard.map((entry, index) => (
-                  <div key={entry.id} className="rounded-[24px] border border-white/8 bg-white/5 p-4">
+                  <div key={entry.id} className="rounded-[18px] border border-white/10 bg-white/[0.045] p-3">
                     <div className="flex items-center justify-between gap-4">
                       <div>
                         <p className="font-semibold text-white">{index + 1}. {entry.name ?? 'Guest'}</p>
@@ -510,25 +516,33 @@ export function LegacyDashboard() {
             )}
           </article>
 
-          <article className="rounded-[34px] border border-orange-500/15 bg-[#0f0f0f]/90 p-5 shadow-[0_24px_55px_rgba(0,0,0,0.25)] backdrop-blur-xl sm:p-6">
-            <h2 className="text-xl font-semibold text-white">Calendar</h2>
-            <p className="mt-1 text-sm text-slate-300">Scheduled tasks by day.</p>
-            <div className="mt-4 rounded-[24px] border border-white/8 bg-[#06111a] p-4">
+          <article className="surface-card p-4 sm:p-5">
+            <p className="text-xs font-bold uppercase tracking-[0.24em] text-orange-300">Schedule</p>
+            <h2 className="mt-1 text-lg font-semibold text-white">Calendar</h2>
+            <p className="mt-1 text-sm text-slate-400">Scheduled tasks by day.</p>
+            <div className="mt-3 rounded-[20px] border border-white/10 bg-slate-950/55 p-3">
               <TaskCalendar tasks={tasks} />
             </div>
           </article>
         </section>
 
-        <section className="rounded-[34px] border border-orange-500/15 bg-[#0f0f0f]/90 p-5 shadow-[0_24px_55px_rgba(0,0,0,0.25)] backdrop-blur-xl sm:p-6">
+        <section className="surface-card p-4 sm:p-5">
+          <div className="mb-3 flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
+            <div>
+              <p className="text-xs font-bold uppercase tracking-[0.24em] text-orange-300">Execution queue</p>
+              <h2 className="mt-1 text-lg font-semibold text-white">Active task board</h2>
+            </div>
+            <p className="text-sm text-slate-400">{tasks.length} total tasks</p>
+          </div>
           {loadingTasks ? (
             <p className="text-sm text-slate-300">Loading your tasks...</p>
           ) : tasks.length === 0 ? (
-            <div className="rounded-[28px] border border-white/10 bg-white/5 p-6 text-slate-200">
+            <div className="rounded-[20px] border border-white/10 bg-white/[0.045] p-5 text-slate-200">
               <p className="font-semibold">No tasks yet.</p>
               <p className="mt-1 text-sm text-slate-300">Create one on the left or add a suggestion to start your list.</p>
             </div>
           ) : (
-            <div className="space-y-4">
+            <div className="grid gap-2 xl:grid-cols-2">
               {tasks.map((task) => (
                 <TaskCard
                   key={task.id}
