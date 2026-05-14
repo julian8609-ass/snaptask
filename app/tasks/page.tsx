@@ -11,17 +11,17 @@ export default function TodoPage() {
 
   return (
     <main className="studio-shell">
-      <section className="surface-card p-6 sm:p-8">
-        <header className="dashboard-header">
-          <div>
-            <p className="text-sm font-semibold uppercase tracking-[0.35em] text-[var(--brand)]">Task center</p>
-            <h1 className="mt-3 text-3xl font-semibold">Manage your execution pipeline</h1>
-            <p className="mt-2 text-[var(--text-secondary)]">Capture, prioritize, and complete work with clarity.</p>
+      <section className="surface-card p-4 sm:p-5">
+        <header className="dashboard-header flex-col items-start sm:flex-row sm:items-center">
+          <div className="max-w-2xl">
+            <p className="text-xs font-bold uppercase tracking-[0.32em] text-[var(--brand)]">Task center</p>
+            <h1 className="mt-2 text-2xl font-semibold sm:text-4xl">Manage your execution pipeline</h1>
+            <p className="mt-1 text-sm text-[var(--text-secondary)]">Capture, prioritize, and complete work with a compact command view.</p>
           </div>
           <Link href="/" className="pill-link">Back to Dashboard</Link>
         </header>
 
-        <div className="metric-grid mt-6">
+        <div className="metric-grid mt-4">
           <article className="metric-tile">
             <p className="metric-label">Total</p>
             <p className="metric-value">{stats.total}</p>
@@ -41,17 +41,24 @@ export default function TodoPage() {
         </div>
       </section>
 
-      <section className="content-grid mt-4">
-        <article className="surface-card p-5 sm:p-6">
-          <h2 className="text-xl font-semibold">Add a task</h2>
-          <div className="mt-4">
+      <section className="content-grid">
+        <article className="surface-card p-4 sm:p-5">
+          <p className="text-xs font-bold uppercase tracking-[0.24em] text-orange-300">Capture</p>
+          <h2 className="mt-1 text-lg font-semibold">Add a task</h2>
+          <div className="mt-3">
             <TaskForm />
           </div>
         </article>
 
-        <article className="surface-card p-5 sm:p-6">
-          <h2 className="text-xl font-semibold">Task list</h2>
-          <div className="mt-4">
+        <article className="surface-card p-4 sm:p-5">
+          <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
+            <div>
+              <p className="text-xs font-bold uppercase tracking-[0.24em] text-orange-300">Board</p>
+              <h2 className="mt-1 text-lg font-semibold">Task list</h2>
+            </div>
+            <p className="text-sm text-[var(--text-secondary)]">{tasks.length} visible items</p>
+          </div>
+          <div className="mt-3">
             {loading ? (
               <p className="rounded-xl border border-[var(--border)] bg-[var(--bg-muted)] p-4 text-[var(--text-secondary)]">Loading your tasks...</p>
             ) : (

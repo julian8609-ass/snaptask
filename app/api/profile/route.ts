@@ -1,5 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getSupabaseClient, isSupabaseServiceConfigured } from '@/lib/supabase-safe';
+import {
+  getSupabaseClient,
+  isSupabaseUnavailableError,
+  markSupabaseUnavailable,
+  shouldUseSupabaseFallbackSoon,
+} from '@/lib/supabase-safe';
 
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth';
@@ -17,6 +22,30 @@ function getSupabase() {
   return getSupabaseClient();
 }
 
+function buildLocalProfile() {
+  return {
+    name: 'Guest',
+    email: 'demo@local',
+    xp: 0,
+    rank: 'Bronze',
+    streak: 0,
+    mood: 'focused',
+    personality: 'calm_mentor',
+    energy: 5,
+    completedTasks: 0,
+    pendingTasks: 0,
+    aiTasks: 0,
+    userTasks: 0,
+  };
+}
+
+function localProfileResponse() {
+  return NextResponse.json({
+    profile: buildLocalProfile(),
+    leaderboard: [],
+  });
+}
+
 export async function GET(request: NextRequest) {
   try {
     const url = new URL(request.url);
@@ -29,24 +58,9 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'userId required' }, { status: 400 });
     }
 
-    if (!isSupabaseServiceConfigured()) {
-      return NextResponse.json({
-        profile: {
-          name: 'Guest',
-          email: 'demo@local',
-          xp: 0,
-          rank: 'Bronze',
-          streak: 0,
-          mood: 'focused',
-          personality: 'calm_mentor',
-          energy: 5,
-          completedTasks: 0,
-          pendingTasks: 0,
-          aiTasks: 0,
-          userTasks: 0,
-        },
-        leaderboard: [],
-      });
+    if (await shouldUseSupabaseFallbackSoon()) {
+      console.log('Supabase fallback active; returning local profile.');
+      return localProfileResponse();
     }
 
     const supabase = getSupabase();
@@ -61,6 +75,11 @@ export async function GET(request: NextRequest) {
 
     if (profileError) {
       console.error('Profile error:', profileError.message, profileError.details);
+      if (isSupabaseUnavailableError(profileError)) {
+        markSupabaseUnavailable();
+        return localProfileResponse();
+      }
+
       // Create a default profile if not found
       const defaultProfile = {
         user_id: userId,
@@ -82,6 +101,10 @@ export async function GET(request: NextRequest) {
       
       if (insertError) {
         console.error('Failed to create default profile:', insertError);
+        if (isSupabaseUnavailableError(insertError)) {
+          markSupabaseUnavailable();
+          return localProfileResponse();
+        }
       } else if (insertedProfile) {
         console.log('Created default profile');
         const { data: leaderboardRaw } = await supabase
@@ -128,6 +151,9 @@ export async function GET(request: NextRequest) {
 
     if (leaderboardError) {
       console.error('Leaderboard error:', leaderboardError);
+      if (isSupabaseUnavailableError(leaderboardError)) {
+        markSupabaseUnavailable();
+      }
     }
 
     // Fetch user names for leaderboard entries
@@ -159,6 +185,10 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ profile: profileWithRank, leaderboard: leaderboard || [] });
   } catch (error) {
     console.error('Error fetching user profile:', error);
+    if (isSupabaseUnavailableError(error)) {
+      markSupabaseUnavailable();
+      return localProfileResponse();
+    }
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     return NextResponse.json({ error: `Server error: ${errorMessage}` }, { status: 500 });
   }
@@ -166,7 +196,6 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const supabase = getSupabase();
     const body = await request.json();
     const { userId, bio, theme, timezone } = body;
 
@@ -174,6 +203,17 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'userId required' }, { status: 400 });
     }
 
+    if (await shouldUseSupabaseFallbackSoon()) {
+      return NextResponse.json({
+        ...buildLocalProfile(),
+        bio: bio || null,
+        theme: theme || 'dark',
+        timezone: timezone || 'UTC',
+        updated_at: new Date().toISOString(),
+      });
+    }
+
+    const supabase = getSupabase();
     const { data: profile, error } = await supabase
       .from('user_profiles')
       .update({
@@ -187,6 +227,16 @@ export async function POST(request: NextRequest) {
 
     if (error) {
       console.error('Supabase error:', error);
+      if (isSupabaseUnavailableError(error)) {
+        markSupabaseUnavailable();
+        return NextResponse.json({
+          ...buildLocalProfile(),
+          bio: bio || null,
+          theme: theme || 'dark',
+          timezone: timezone || 'UTC',
+          updated_at: new Date().toISOString(),
+        });
+      }
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 

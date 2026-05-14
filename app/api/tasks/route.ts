@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getSupabaseClient } from '@/lib/supabase-safe';
+import { getSupabaseClient, isSupabaseUnavailableError, markSupabaseUnavailable, shouldUseSupabaseFallbackSoon } from '@/lib/supabase-safe';
+import db from '@/lib/db';
 
 const xpByDifficulty = {
   easy: 10,
@@ -48,6 +49,15 @@ function getSupabase() {
   return getSupabaseClient();
 }
 
+function isSupabaseNotConfigured(error: { code?: string; message?: string } | null | undefined) {
+  return isSupabaseUnavailableError(error);
+}
+
+async function getLocalTasksForUser(userId: string) {
+  const localTasks = (await db.tasks.getAll()).filter((task) => task.user_id === userId);
+  return localTasks.map(normalizeTask);
+}
+
 export async function GET(request: NextRequest) {
   try {
     const supabase = getSupabase();
@@ -61,6 +71,12 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'userId required' }, { status: 400 });
     }
 
+    if (await shouldUseSupabaseFallbackSoon()) {
+      const localTasks = await getLocalTasksForUser(userId);
+      console.log('Supabase fallback active; returning local tasks:', localTasks.length);
+      return NextResponse.json(localTasks);
+    }
+
     console.log('Fetching tasks for userId:', userId);
     const { data: tasks, error } = await supabase
       .from('tasks')
@@ -70,6 +86,12 @@ export async function GET(request: NextRequest) {
 
     if (error) {
       console.error('Supabase error:', error.message, error.details);
+      if (isSupabaseNotConfigured(error)) {
+        markSupabaseUnavailable();
+        const localTasks = await getLocalTasksForUser(userId);
+        console.warn('Supabase unavailable; returning local fallback tasks:', localTasks.length);
+        return NextResponse.json(localTasks);
+      }
       return NextResponse.json(
         { error: `Database error: ${error.message}` },
         { status: 500 }
@@ -103,6 +125,24 @@ export async function POST(request: NextRequest) {
     const energy = typeof body.energy === 'number' ? body.energy : energyByDifficulty[difficulty] ?? 2;
     const xpReward = typeof body.xp === 'number' ? body.xp : typeof body.xp_reward === 'number' ? body.xp_reward : xpByDifficulty[difficulty] ?? 10;
 
+    if (await shouldUseSupabaseFallbackSoon()) {
+      const localTask = await db.tasks.create({
+        user_id: userId,
+        title: String(title).trim(),
+        description: description ? String(description).trim() : undefined,
+        priority: priorityInput,
+        status: 'todo',
+        due_date: dueDate || undefined,
+        energy,
+        xp: xpReward,
+        source: 'USER',
+        scheduledDate: dueDate,
+        scheduledTime: null,
+      });
+      console.log('Supabase fallback active; created local task:', localTask.id);
+      return NextResponse.json(normalizeTask(localTask), { status: 201 });
+    }
+
     const { data: task, error } = await supabase
       .from('tasks')
       .insert([
@@ -120,6 +160,24 @@ export async function POST(request: NextRequest) {
 
     if (error) {
       console.error('Supabase error:', error.message, error.details);
+      if (isSupabaseNotConfigured(error)) {
+        markSupabaseUnavailable();
+        console.warn('Supabase unavailable; creating local fallback task.');
+        const localTask = await db.tasks.create({
+          user_id: userId,
+          title: String(title).trim(),
+          description: description ? String(description).trim() : undefined,
+          priority: priorityInput,
+          status: 'todo',
+          due_date: dueDate || undefined,
+          energy,
+          xp: xpReward,
+          source: 'USER',
+          scheduledDate: dueDate,
+          scheduledTime: null,
+        });
+        return NextResponse.json(normalizeTask(localTask), { status: 201 });
+      }
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 

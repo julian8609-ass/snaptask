@@ -79,18 +79,44 @@ export function TaskForm() {
   };
 
   return (
-    <Card sx={{ mb: 3, boxShadow: 3 }}>
-      <CardContent>
+    <Card
+      sx={{
+        mb: 0,
+        borderRadius: 4,
+        background: 'rgba(255,255,255,0.035)',
+        border: '1px solid rgba(255,255,255,0.08)',
+        boxShadow: 'none',
+        color: '#f8fafc',
+        '& .MuiInputLabel-root': { color: '#94a3b8' },
+        '& .MuiInputLabel-root.Mui-disabled': { color: '#64748b' },
+        '& .MuiInputBase-input': { color: '#f8fafc' },
+        '& .MuiInputBase-input.Mui-disabled': { WebkitTextFillColor: '#64748b' },
+        '& .MuiAutocomplete-endAdornment .MuiSvgIcon-root': { color: '#94a3b8' },
+      }}
+    >
+      <CardContent sx={{ p: { xs: 2, sm: 2.5 }, '&:last-child': { pb: { xs: 2, sm: 2.5 } } }}>
         <form onSubmit={handleSubmit}>
-          <Stack spacing={2}>
+          <Stack spacing={1.5}>
             <TextField
               fullWidth
               label="Task Title"
-              placeholder="Enter a task (e.g., 'Call John tomorrow morning')"
+              placeholder="e.g. Call John tomorrow morning"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               disabled={loading || isAnalyzing}
               variant="outlined"
+              size="small"
+              InputLabelProps={{ shrink: true, sx: { color: '#94a3b8' } }}
+              InputProps={{
+                sx: {
+                  color: '#f8fafc',
+                  borderRadius: 3,
+                  bgcolor: 'rgba(2,6,23,0.72)',
+                  '& .MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(255,255,255,0.1)' },
+                  '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(249,115,22,0.45)' },
+                  '&.Mui-focused .MuiOutlinedInput-notchedOutline': { borderColor: '#f97316' },
+                },
+              }}
             />
 
             <TextField
@@ -101,11 +127,23 @@ export function TaskForm() {
               onChange={(e) => setDescription(e.target.value)}
               disabled={loading || isAnalyzing}
               multiline
-              rows={3}
+              rows={2}
               variant="outlined"
+              size="small"
+              InputLabelProps={{ shrink: true, sx: { color: '#94a3b8' } }}
+              InputProps={{
+                sx: {
+                  color: '#f8fafc',
+                  borderRadius: 3,
+                  bgcolor: 'rgba(2,6,23,0.72)',
+                  '& .MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(255,255,255,0.1)' },
+                  '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(249,115,22,0.45)' },
+                  '&.Mui-focused .MuiOutlinedInput-notchedOutline': { borderColor: '#f97316' },
+                },
+              }}
             />
 
-            <Stack direction="row" spacing={2}>
+            <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.25}>
               <Autocomplete
                 sx={{ flex: 1 }}
                 options={CATEGORIES}
@@ -113,7 +151,23 @@ export function TaskForm() {
                 onChange={(e, value) => setSelectedCategory(value)}
                 disabled={loading || isAnalyzing}
                 renderInput={(params) => (
-                  <TextField {...params} label="Category" />
+                  <TextField
+                    {...params}
+                    label="Category"
+                    size="small"
+                    InputLabelProps={{ shrink: true, sx: { color: '#94a3b8' } }}
+                    InputProps={{
+                      ...params.InputProps,
+                      sx: {
+                        color: '#f8fafc',
+                        borderRadius: 3,
+                        bgcolor: 'rgba(2,6,23,0.72)',
+                        '& .MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(255,255,255,0.1)' },
+                        '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(249,115,22,0.45)' },
+                        '&.Mui-focused .MuiOutlinedInput-notchedOutline': { borderColor: '#f97316' },
+                      },
+                    }}
+                  />
                 )}
               />
 
@@ -124,7 +178,23 @@ export function TaskForm() {
                 onChange={(e, value) => setSelectedPriority(value)}
                 disabled={loading || isAnalyzing}
                 renderInput={(params) => (
-                  <TextField {...params} label="Priority" />
+                  <TextField
+                    {...params}
+                    label="Priority"
+                    size="small"
+                    InputLabelProps={{ shrink: true, sx: { color: '#94a3b8' } }}
+                    InputProps={{
+                      ...params.InputProps,
+                      sx: {
+                        color: '#f8fafc',
+                        borderRadius: 3,
+                        bgcolor: 'rgba(2,6,23,0.72)',
+                        '& .MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(255,255,255,0.1)' },
+                        '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(249,115,22,0.45)' },
+                        '&.Mui-focused .MuiOutlinedInput-notchedOutline': { borderColor: '#f97316' },
+                      },
+                    }}
+                  />
                 )}
               />
             </Stack>
@@ -135,14 +205,14 @@ export function TaskForm() {
                   display: 'flex',
                   alignItems: 'center',
                   gap: 1.5,
-                  p: 1.5,
-                  backgroundColor: '#fff3e0',
-                  borderRadius: 1,
-                  border: '1px solid #ffe0b2',
+                  p: 1.25,
+                  backgroundColor: 'rgba(249,115,22,0.1)',
+                  borderRadius: 3,
+                  border: '1px solid rgba(249,115,22,0.22)',
                 }}
               >
-                <Typography variant="subtitle2" sx={{ color: '#e65100', fontWeight: 600 }}>
-                  Estimated Energy Cost:
+                <Typography variant="subtitle2" sx={{ color: '#fed7aa', fontWeight: 700 }}>
+                  Energy Cost
                 </Typography>
                 <Chip
                   label={`${energyCost} energy`}
@@ -170,6 +240,8 @@ export function TaskForm() {
                 background: 'linear-gradient(135deg, #f97316 0%, #ea580c 100%)',
                 color: '#0a0a0a',
                 fontWeight: 'bold',
+                borderRadius: 999,
+                py: 1.15,
                 '&:hover': {
                   background: 'linear-gradient(135deg, #fb923c 0%, #f97316 100%)',
                 },

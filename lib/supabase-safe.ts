@@ -1,6 +1,11 @@
 import { createClient } from '@supabase/supabase-js';
 
 let cachedClient: any = null;
+let cachedClientIsDisabled = false;
+let supabaseUnavailableUntil = 0;
+let supabaseReachableUntil = 0;
+const SUPABASE_UNAVAILABLE_TTL_MS = 60_000;
+const SUPABASE_REACHABLE_TTL_MS = 30_000;
 
 /** Same rules as @supabase/supabase-js `validateSupabaseUrl` (scheme + parseable URL + hostname). */
 export function isSupabaseServiceConfigured(): boolean {
@@ -14,6 +19,68 @@ export function isSupabaseServiceConfigured(): boolean {
     return (u.protocol === 'http:' || u.protocol === 'https:') && Boolean(u.hostname);
   } catch {
     return false;
+  }
+}
+
+export function isSupabaseUnavailableError(error: unknown): boolean {
+  const value = error as { code?: unknown; message?: unknown; details?: unknown; cause?: unknown } | null | undefined;
+  const haystack = [
+    value?.code,
+    value?.message,
+    value?.details,
+    value?.cause instanceof Error ? value.cause.message : value?.cause,
+    error instanceof Error ? error.message : undefined,
+  ]
+    .filter(Boolean)
+    .map(String)
+    .join(' ');
+
+  return (
+    haystack.includes('supabase_not_configured') ||
+    haystack.includes('Supabase is not configured') ||
+    haystack.includes('fetch failed') ||
+    haystack.includes('Failed to fetch') ||
+    haystack.includes('ENOTFOUND') ||
+    haystack.includes('ECONNRESET') ||
+    haystack.includes('ECONNREFUSED') ||
+    haystack.includes('ETIMEDOUT') ||
+    haystack.includes('network')
+  );
+}
+
+export function markSupabaseUnavailable() {
+  supabaseUnavailableUntil = Date.now() + SUPABASE_UNAVAILABLE_TTL_MS;
+}
+
+export function isSupabaseTemporarilyUnavailable(): boolean {
+  return Date.now() < supabaseUnavailableUntil;
+}
+
+export function shouldUseSupabaseFallback(): boolean {
+  return !isSupabaseServiceConfigured() || isSupabaseTemporarilyUnavailable();
+}
+
+export async function shouldUseSupabaseFallbackSoon(): Promise<boolean> {
+  if (shouldUseSupabaseFallback()) return true;
+  if (Date.now() < supabaseReachableUntil) return false;
+
+  const url = (process.env.NEXT_PUBLIC_SUPABASE_URL || '').trim();
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 750);
+
+  try {
+    await fetch(url, {
+      method: 'HEAD',
+      signal: controller.signal,
+      cache: 'no-store',
+    });
+    supabaseReachableUntil = Date.now() + SUPABASE_REACHABLE_TTL_MS;
+    return false;
+  } catch {
+    markSupabaseUnavailable();
+    return true;
+  } finally {
+    clearTimeout(timeout);
   }
 }
 
@@ -93,15 +160,17 @@ function getDisabledSupabaseClient() {
 }
 
 export function getSupabaseClient() {
-  if (cachedClient) return cachedClient;
+  const configured = isSupabaseServiceConfigured();
+  if (cachedClient && !(cachedClientIsDisabled && configured)) return cachedClient;
 
-  if (!isSupabaseServiceConfigured()) {
+  if (!configured) {
     if (process.env.NODE_ENV === 'development') {
       console.warn(
         '[supabase] Missing or invalid NEXT_PUBLIC_SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY — using no-op client (empty data, failed writes).',
       );
     }
     cachedClient = getDisabledSupabaseClient();
+    cachedClientIsDisabled = true;
     return cachedClient;
   }
 
@@ -109,9 +178,11 @@ export function getSupabaseClient() {
   const key = (process.env.SUPABASE_SERVICE_ROLE_KEY || '').trim();
   try {
     cachedClient = createClient(url, key);
+    cachedClientIsDisabled = false;
   } catch (e) {
     console.warn('[supabase] createClient failed; using no-op client.', e);
     cachedClient = getDisabledSupabaseClient();
+    cachedClientIsDisabled = true;
   }
   return cachedClient;
 }

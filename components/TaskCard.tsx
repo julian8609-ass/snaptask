@@ -15,52 +15,57 @@ interface TaskCardProps {
 }
 
 const difficultyStyles: Record<string, string> = {
-  easy: 'bg-orange-400/15 text-orange-200',
-  medium: 'bg-orange-500/15 text-orange-200',
-  hard: 'bg-rose-400/15 text-rose-200',
+  easy: 'bg-emerald-400/10 text-emerald-200 ring-emerald-300/20',
+  medium: 'bg-orange-500/15 text-orange-200 ring-orange-300/20',
+  hard: 'bg-rose-400/15 text-rose-200 ring-rose-300/20',
 };
 
 export function TaskCard({ task, onComplete, onSkip, onDelete }: TaskCardProps) {
+  const isCompleted = task.status === 'completed';
+
   return (
-    <article className="rounded-[2rem] border border-orange-500/15 bg-[#101010] p-5 shadow-2xl shadow-black/20 transition duration-300 hover:-translate-y-1 hover:bg-[#151515]">
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <div className="mb-3 flex flex-wrap items-center gap-2 text-xs uppercase tracking-[0.35em] text-slate-300">
-            <span className={`rounded-full px-3 py-1 ${difficultyStyles[task.difficulty]}`}>
+    <article className="group rounded-[20px] border border-white/10 bg-gradient-to-br from-white/[0.07] to-white/[0.025] p-3 shadow-xl shadow-black/10 transition duration-200 hover:-translate-y-0.5 hover:border-orange-400/30 hover:bg-white/[0.075] sm:p-4">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div className="min-w-0">
+          <div className="mb-2 flex flex-wrap items-center gap-1.5 text-[0.68rem] font-bold uppercase tracking-[0.16em] text-slate-300">
+            <span className={`rounded-full px-2.5 py-1 ring-1 ${difficultyStyles[task.difficulty]}`}>
               {task.difficulty}
             </span>
-            <span className="rounded-full bg-[#1b1b1b] px-3 py-1 text-slate-200">
+            <span className="rounded-full bg-white/5 px-2.5 py-1 text-slate-200 ring-1 ring-white/10">
               {task.energy} energy
             </span>
+            <span className={`rounded-full px-2.5 py-1 ring-1 ${isCompleted ? 'bg-emerald-500/10 text-emerald-200 ring-emerald-300/20' : 'bg-sky-500/10 text-sky-200 ring-sky-300/20'}`}>
+              {isCompleted ? 'completed' : 'todo'}
+            </span>
           </div>
-          <h3 className={`text-lg font-semibold ${task.status === 'completed' ? 'text-slate-300 line-through' : 'text-white'}`}>
+          <h3 className={`truncate text-base font-semibold ${isCompleted ? 'text-slate-400 line-through' : 'text-white'}`}>
             {task.title}
           </h3>
-          <div className="mt-3 text-sm text-slate-400">
-            {task.status === 'completed' ? 'Completed ✅' : 'Still waiting for your move.'}
+          <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-white/5">
+            <div className={`h-full rounded-full ${isCompleted ? 'w-full bg-emerald-400' : 'w-1/3 bg-orange-400'}`} />
           </div>
         </div>
 
-        <div className="grid gap-2">
+        <div className="grid grid-cols-3 gap-1.5 sm:w-[118px] sm:grid-cols-1">
           <button
             type="button"
             onClick={() => onComplete(task.id)}
-            disabled={task.status === 'completed'}
-            className="rounded-full bg-orange-500 px-4 py-2 text-sm font-semibold text-slate-950 transition hover:bg-orange-400 disabled:cursor-not-allowed disabled:opacity-50"
+            disabled={isCompleted}
+            className="rounded-full bg-orange-500 px-3 py-2 text-xs font-bold text-slate-950 transition hover:bg-orange-400 disabled:cursor-not-allowed disabled:opacity-45"
           >
-            {task.status === 'completed' ? 'Done' : 'Complete'}
+            {isCompleted ? 'Done' : 'Complete'}
           </button>
           <button
             type="button"
             onClick={() => onSkip(task.id)}
-            className="rounded-full bg-white/10 px-4 py-2 text-sm font-semibold text-white transition hover:bg-white/20"
+            className="rounded-full bg-white/10 px-3 py-2 text-xs font-bold text-white transition hover:bg-white/20"
           >
             Skip {task.skipCount > 0 ? `(${task.skipCount})` : ''}
           </button>
           <button
             type="button"
             onClick={() => onDelete(task.id)}
-            className="rounded-full bg-rose-500 px-4 py-2 text-sm font-semibold text-white transition hover:bg-rose-400"
+            className="rounded-full bg-rose-500/90 px-3 py-2 text-xs font-bold text-white transition hover:bg-rose-400"
           >
             Delete
           </button>

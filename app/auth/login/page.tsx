@@ -42,31 +42,32 @@ export default function LoginPage() {
   };
 
   return (
-    <main className="min-h-screen bg-slate-950 px-6 py-12 text-slate-100">
-      <div className="mx-auto max-w-lg rounded-[2rem] border border-white/10 bg-slate-900/80 p-10 shadow-2xl shadow-black/20">
-        <h1 className="text-3xl font-semibold text-white">Sign in to your account</h1>
-        <p className="mt-3 text-sm text-slate-300">Use your email and password to sign in and access your AI task dashboard.</p>
+    <main className="studio-shell flex min-h-screen items-center">
+      <div className="surface-card mx-auto w-full max-w-lg p-5 sm:p-7">
+        <p className="text-xs font-bold uppercase tracking-[0.32em] text-orange-300">Welcome back</p>
+        <h1 className="mt-2 text-2xl font-semibold text-white sm:text-3xl">Sign in to SnapTask</h1>
+        <p className="mt-2 text-sm text-slate-300">Use your email and password to access your AI task dashboard.</p>
 
-        <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
-          <label className="block text-sm font-medium text-slate-200">
+        <form className="mt-5 space-y-4" onSubmit={handleSubmit}>
+          <label className="app-label">
             Email
             <input
               type="email"
               value={email}
               onChange={(event) => setEmail(event.target.value)}
               required
-              className="mt-2 w-full rounded-3xl border border-white/10 bg-slate-950/80 px-4 py-3 text-white outline-none transition focus:border-emerald-300"
+              className="app-input"
             />
           </label>
 
-          <label className="block text-sm font-medium text-slate-200">
+          <label className="app-label">
             Password
             <input
               type="password"
               value={password}
               onChange={(event) => setPassword(event.target.value)}
               required
-              className="mt-2 w-full rounded-3xl border border-white/10 bg-slate-950/80 px-4 py-3 text-white outline-none transition focus:border-emerald-300"
+              className="app-input"
             />
           </label>
 
@@ -75,7 +76,7 @@ export default function LoginPage() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full rounded-full bg-emerald-400 px-5 py-3 text-sm font-semibold text-slate-950 transition hover:bg-emerald-300 disabled:opacity-60"
+            className="app-primary-button w-full"
           >
             {loading ? 'Signing in…' : 'Sign in'}
           </button>
@@ -83,7 +84,7 @@ export default function LoginPage() {
 
         <p className="mt-6 text-center text-sm text-slate-400">
           Need an account?{' '}
-          <Link href="/auth/register" className="font-semibold text-white hover:text-emerald-300">
+          <Link href="/auth/register" className="font-semibold text-orange-200 hover:text-orange-100">
             Create one
           </Link>
         </p>

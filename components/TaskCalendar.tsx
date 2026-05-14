@@ -63,41 +63,42 @@ export function TaskCalendar({ tasks }: TaskCalendarProps) {
 
   return (
     <div className="w-full">
-      <div className="flex items-center justify-between gap-2 mb-3">
+      <div className="mb-3 flex items-center justify-between gap-2">
         <div>
-          <h3 className="text-sm font-semibold text-white">{format(currentDate, 'MMM yyyy')}</h3>
+          <h3 className="text-sm font-bold text-white">{format(currentDate, 'MMMM yyyy')}</h3>
+          <p className="text-xs text-slate-500">{tasks.filter((task) => task.scheduledDate).length} scheduled</p>
         </div>
         <div className="flex gap-1">
           <button
             onClick={() => setCurrentDate(subMonths(currentDate, 1))}
-            className="rounded px-2 py-0.5 text-xs font-semibold text-orange-300 transition hover:bg-orange-400/20"
+            className="rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-xs font-semibold text-orange-200 transition hover:bg-orange-400/20"
           >
             ←
           </button>
           <button
             onClick={() => setCurrentDate(new Date())}
-            className="rounded px-2 py-0.5 text-xs font-semibold text-slate-100 transition hover:bg-white/10"
+            className="rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-xs font-semibold text-slate-100 transition hover:bg-white/10"
           >
             Today
           </button>
           <button
             onClick={() => setCurrentDate(addMonths(currentDate, 1))}
-            className="rounded px-2 py-0.5 text-xs font-semibold text-orange-300 transition hover:bg-orange-400/20"
+            className="rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-xs font-semibold text-orange-200 transition hover:bg-orange-400/20"
           >
             →
           </button>
         </div>
       </div>
 
-      <div className="grid grid-cols-7 gap-0.5 mb-2">
+      <div className="mb-2 grid grid-cols-7 gap-1">
         {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((day, idx) => (
-          <div key={`day-${idx}`} className="text-center text-xs text-slate-400 font-semibold py-0.5">
+          <div key={`day-${idx}`} className="py-0.5 text-center text-[0.68rem] font-bold text-slate-500">
             {day}
           </div>
         ))}
       </div>
 
-      <div className="grid grid-cols-7 gap-0.5">
+      <div className="grid grid-cols-7 gap-1">
         {calendarDays.map((day, index) => {
           const scheduledTasks = day ? getScheduledTasksForDay(day) : [];
           const hasScheduledTasks = scheduledTasks.length > 0;
@@ -105,14 +106,14 @@ export function TaskCalendar({ tasks }: TaskCalendarProps) {
           return (
             <div
               key={index}
-              className={`aspect-square rounded text-xs transition-all flex flex-col items-center justify-center p-0.5 relative group ${
+              className={`group relative flex aspect-square flex-col items-center justify-center rounded-xl p-0.5 text-xs transition-all ${
                 day === null
                   ? 'bg-transparent'
                   : isToday(day)
-                  ? 'border border-orange-400 bg-orange-500/15'
+                  ? 'border border-orange-300 bg-orange-500/20 shadow-[0_0_0_3px_rgba(249,115,22,0.08)]'
                   : hasScheduledTasks
-                  ? 'border border-orange-400/50 bg-[#161616]'
-                  : 'border border-white/5 bg-slate-950/80 hover:bg-slate-900/80'
+                  ? 'border border-orange-400/45 bg-orange-500/10'
+                  : 'border border-white/8 bg-slate-950/70 hover:bg-slate-900/90'
               }`}
               onMouseEnter={() => hasScheduledTasks && setHoveredDay(day)}
               onMouseLeave={() => setHoveredDay(null)}
@@ -123,14 +124,14 @@ export function TaskCalendar({ tasks }: TaskCalendarProps) {
                     {day}
                   </span>
                   {hasScheduledTasks && (
-                    <span className="inline-flex items-center justify-center rounded-full bg-orange-400 w-3 h-3 text-xs font-bold text-slate-950 leading-none">
+                    <span className="mt-0.5 inline-flex h-3.5 min-w-3.5 items-center justify-center rounded-full bg-orange-400 px-1 text-[0.6rem] font-bold leading-none text-slate-950">
                       {scheduledTasks.length}
                     </span>
                   )}
 
                   {/* Tooltip with scheduled tasks */}
                   {hoveredDay === day && hasScheduledTasks && (
-                    <div className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 bg-slate-950 border border-orange-400/50 rounded-lg p-2 whitespace-nowrap z-50 shadow-lg min-w-[180px] max-w-xs">
+                    <div className="absolute bottom-full left-1/2 z-50 mb-2 min-w-[180px] max-w-xs -translate-x-1/2 whitespace-nowrap rounded-xl border border-orange-400/50 bg-slate-950 p-2 shadow-2xl shadow-black/50">
                       <div className="text-xs text-orange-400 font-semibold mb-1">Scheduled tasks:</div>
                       <div className="space-y-1">
                         {scheduledTasks.slice(0, 3).map((task) => (
@@ -158,7 +159,7 @@ export function TaskCalendar({ tasks }: TaskCalendarProps) {
       </div>
 
       {/* Legend */}
-      <div className="mt-3 flex gap-3 text-xs text-slate-400">
+      <div className="mt-3 flex flex-wrap gap-3 text-xs text-slate-400">
         <div className="flex items-center gap-1">
           <div className="w-3 h-3 rounded-full bg-orange-500" />
           <span>Easy</span>
